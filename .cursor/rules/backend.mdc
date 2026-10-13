@@ -1,24 +1,27 @@
 ---
-description: Backend rules for FastAPI, SQLite, and immutable audio
+description: Backend rules for FastAPI, the analysis worker, and immutable audio
 globs: backend/**
 alwaysApply: false
 ---
 
 # Backend
 
-Python 3.12, FastAPI, Pydantic. Specs: `docs/01_TECHNICAL_MVP_SPEC.md`, `docs/03_CURSOR_AGENT_FIRST_SESSION.md`.
+Python 3.12, FastAPI, Pydantic, NumPy, SciPy, Matplotlib, and FFmpeg. Product contract: `docs/01_TECHNICAL_MVP_SPEC.md` and `docs/04_TECHNICAL_CHART_REQUIREMENTS.md`.
 
 - Hash uploads with SHA-256 while streaming. Never read a master into memory just to hash it.
 - Filenames are display strings. Never use them as filesystem paths.
-- Original audio bytes are immutable. A 24-bit playback file is a separate cached derivative.
-- `POST /api/assets/{id}/analyze` returns 202 and a real job. The request does not run the measurement. A separate worker claims queued jobs and may complete, fail, or mark an abandoned running job interrupted.
+- The stored blob is the upload. A 16-bit master is played from that blob. A 24-bit master is played from `derivatives/{sha256}/pcm_s16le-triangular-v1.wav` (`pcm_s16le`, triangular dither, same rate, channels, and duration). Analysis reads the master blob, not the derivative.
+- `POST /api/assets/{id}/analyze` returns 202 and does not measure. If a completed run for this asset, `m1-v2`, and the `PARAMS` hash already has `metrics.json`, the handler records a completed job and does not call the worker. Otherwise `python -m app.worker` claims the queued job. It may complete, fail, or mark an abandoned `running` job failed with error `interrupted`. `completed` requires `metrics.json` on disk.
+- Measurements live in `app/measure.py`. Chart documents live in `app/charts.py`. PNGs render those documents. Reuse NumPy, SciPy, and FFmpeg. Do not add another DSP library or reimplement EBU R128.
+- Scale integer PCM by its own full scale: 32768 for 16-bit and 8388608 for 24-bit. Update `ALGORITHM_VERSION` and `PARAMS` when the measurement changes. Mono input does not invent a right channel. T05 then has chart status `not_available` and evidence class `not_applicable`. Silence and files too short for a window stay finite; record why a window was omitted.
+- One chart failure leaves the other charts in place. `ChartUnavailable` is status `not_available`. Any other builder error is status `failed`. Those statuses are not evidence classes.
 - Migrations enable foreign keys. `assets.sha256` and `(project_id, asset_id)` stay unique.
-- Test with pytest.
+- Extend pytest when a change affects scale, loudness, spectrum, hashes, job transitions, or the HTTP contract.
 
 ```python
-# ❌ BAD
+# BAD
 path = data_root / upload.filename
 
-# ✅ GOOD
+# GOOD
 path = data_root / "blobs" / sha256
 ```

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react"
 import * as echarts from "echarts"
-import type { ChartDocument } from "./api/types"
+import type { ChartDocument, ReviewMarker } from "./api/types"
 
 export function ChartView({ chart, onSeek }: { chart: ChartDocument; onSeek: (seconds: number) => void }) {
   const node = useRef<HTMLDivElement>(null)
@@ -38,7 +38,28 @@ export function ChartView({ chart, onSeek }: { chart: ChartDocument; onSeek: (se
   const lines = chart.series.lines?.length ?? 0
   const bars = chart.series.bars?.length ?? 0
   const stacked = lines > 0 && (bars > 0 || chart.series.heatmap != null)
-  return <div ref={node} className={stacked ? "chart stacked" : "chart"} role="img" aria-label={chart.title} />
+  return (
+    <>
+      <div ref={node} className={stacked ? "chart stacked" : "chart"} role="img" aria-label={chart.title} />
+      {chart.review_markers.length > 0 ? (
+        <ul className="markers">
+          {chart.review_markers.map((marker) => (
+            <li key={`${marker.kind ?? "event"}-${marker.time_s}-${marker.label}`}>
+              <button type="button" onClick={() => onSeek(marker.time_s)}>
+                {markerText(marker)}
+              </button>
+              {marker.caveat ? <span className="quiet">{marker.caveat}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </>
+  )
+}
+
+function markerText(marker: ReviewMarker): string {
+  const value = marker.value ? ` ${marker.value}` : ""
+  return `${marker.kind ?? "event"} ${marker.time_s.toFixed(3)} s ${marker.label}${value}`
 }
 
 function timeOf(chart: ChartDocument, raw: unknown): number | null {
@@ -93,7 +114,7 @@ function optionFor(chart: ChartDocument, ink: string): echarts.EChartsOption {
         })
       }
     }
-    return withMap(text, grids, xAxis, yAxis, series, flat)
+    return withMap(text, grids, xAxis, yAxis, series, flat, chart)
   }
 
   if (lines.length > 0) {
@@ -136,6 +157,8 @@ function optionFor(chart: ChartDocument, ink: string): echarts.EChartsOption {
       itemStyle: { color: "#9a3412" },
     })
   }
+  attachMarkers(chart, series)
+  const timed = (chart.axis_definitions.x ?? "").toLowerCase().startsWith("time")
   return {
     animation: false,
     textStyle: { color: text },
@@ -145,6 +168,7 @@ function optionFor(chart: ChartDocument, ink: string): echarts.EChartsOption {
     xAxis,
     yAxis,
     series,
+    dataZoom: timed && lines.length > 0 ? zoom() : undefined,
   }
 }
 
@@ -155,7 +179,10 @@ function withMap(
   yAxis: echarts.YAXisComponentOption[],
   series: echarts.SeriesOption[],
   flat: number[],
+  chart: ChartDocument,
 ): echarts.EChartsOption {
+  attachMarkers(chart, series)
+  const timed = (chart.axis_definitions.x ?? "").toLowerCase().startsWith("time")
   return {
     animation: false,
     textStyle: { color: text },
@@ -165,6 +192,7 @@ function withMap(
     xAxis,
     yAxis,
     series,
+    dataZoom: timed ? zoom() : undefined,
     visualMap: {
       show: false,
       min: Math.min(...flat),
@@ -173,4 +201,32 @@ function withMap(
       inRange: { color: ["#1c2430", "#9a3412", "#e6e0d4"] },
     },
   }
+}
+
+function attachMarkers(chart: ChartDocument, series: echarts.SeriesOption[]) {
+  const layer = markerLayer(chart)
+  const host = series.find((item) => item.type === "line")
+  if (!layer || !host || host.type !== "line") {
+    return
+  }
+  host.markLine = layer
+}
+
+function markerLayer(chart: ChartDocument): echarts.MarkLineComponentOption | undefined {
+  if (!(chart.axis_definitions.x ?? "").toLowerCase().startsWith("time") || chart.review_markers.length === 0) {
+    return undefined
+  }
+  return {
+    symbol: "none",
+    animation: false,
+    lineStyle: { color: "#b08d57", type: "dashed" },
+    data: chart.review_markers.map((marker) => ({ xAxis: marker.time_s, name: marker.label })),
+  }
+}
+
+function zoom(): echarts.DataZoomComponentOption[] {
+  return [
+    { type: "inside", xAxisIndex: 0, filterMode: "none" },
+    { type: "slider", xAxisIndex: 0, filterMode: "none", height: 16, bottom: 4 },
+  ]
 }

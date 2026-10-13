@@ -1,40 +1,42 @@
 ---
-description: Audio Reference Studio architecture, local-first boundaries, and milestone gates
+description: Audio Reference Studio boundaries, evidence labels, and milestone gates
 alwaysApply: true
 ---
 
 # Audio Reference Studio
 
-Specs live in `docs/01_TECHNICAL_MVP_SPEC.md`, `docs/03_CURSOR_AGENT_FIRST_SESSION.md`, and `docs/04_TECHNICAL_CHART_REQUIREMENTS.md`. Follow them; do not copy them into code comments.
+Follow `docs/01_TECHNICAL_MVP_SPEC.md` and `docs/04_TECHNICAL_CHART_REQUIREMENTS.md`. Do not paste them into code or into these rules.
+
+`docs/03_CURSOR_AGENT_FIRST_SESSION.md` is the historical Milestone 0 session. `NEXT_SESSION.md` is an outdated handoff pending human validation of Milestone 1. Neither file accepts a later milestone.
+
+## Milestones
+
+Milestone 0 is `e4f1223`: WAV import, playback, and charts left `not_run`. Milestone 1 is `0f7d7aa`: the analysis worker and charts T01–T10. Preserve that implementation. It is not a validated release. Do not start Milestone 2 (timed lyrics, ZIP export, album comparison, or a narrative client) unless the user asks.
 
 ## Architecture
 
-React/TypeScript frontend, Python 3.12/FastAPI backend, SQLite plus local files. Analysis that exists later is deterministic. Optional AI interpretation stays off by default.
+React 19, TypeScript, and Vite on `127.0.0.1:5173`. Python 3.12 and FastAPI on `127.0.0.1:8000`. SQLite plus files under the data root. No cloud, auth, telemetry, payments, or paid API calls.
 
-## Local-first
+Frontend owns `frontend/**`. Backend owns `backend/**`. Neither edits the other's tree or `references/legacy-audit/`. Change the API contract before either side depends on it. Regenerate `frontend/src/api/types.ts`; do not hand-edit it.
 
-Bind `127.0.0.1`. No cloud, auth, telemetry, payments, or paid API calls.
+## Playback
 
-## Gates
+Accepted audio is 16-bit or 24-bit integer PCM WAV. The blob `blobs/{sha256}` stays byte-identical to the upload. A 16-bit master is streamed from that blob, with no derivative. A 24-bit master is streamed from a separate cached file, `derivatives/{sha256}/pcm_s16le-triangular-v1.wav`: FFmpeg writes `pcm_s16le` at the master's sample rate, channel count, and duration, using triangular dither. If that write fails, the import still keeps the master and `playback_status` is `unavailable`.
 
-Stop at the current milestone. Do not start the next one without human approval.
+## Evidence and status
 
-## Evidence
+Evidence class describes how a value was obtained: `measured`, `estimated`, `textual`, `interpretive`, `unknown`, or `not_applicable` when a chart does not apply. Tempo, pitch-class, structure, and recurrence stay estimated. State sample rate, channel count, window or hop, and method version with a number. Give the tolerance when a fixture checks it. Do not infer instrumentation, vocal character, mood, or audible defects. Do not claim to have listened. Do not invent sung timestamps.
 
-Use `measured`, `estimated`, `textual`, `interpretive`, or `unknown`. Never invent sung timestamps or audible-defect verdicts.
+Status is a different field. Asset `analysis_status` is `not_run`, `queued`, `running`, `completed`, or `failed`. Job status adds `canceled`. Chart status is `not_run`, `ready`, `not_available`, or `failed`. `playback_status` is `ready` or `unavailable`. Do not store an evidence class in a status field, or a status in `evidence_class`.
 
-## Delegation
+## Verification
 
-Agree the shared contract first. Frontend owns `frontend/**`. Backend owns `backend/**`. Neither edits the other's tree or `references/legacy-audit/`.
+Changes to numerical results, master bytes or hashes, job lifecycle, or HTTP behavior need a pytest, or an extension of an existing one. A UI change that would hide a wrong status or evidence class needs a Vitest when the current test would miss it. A comment, label, or formatting change does not need a new test.
 
-## Keep approved decisions
+From `backend/`: `uv run ruff check . && uv run pytest -q`
 
-24-bit masters stay byte-identical; playback is a separate cached 16-bit derivative. Analyze stays unimplemented until a real worker exists, and it must not fake a completed job.
+From `frontend/`: `pnpm typecheck && pnpm test && pnpm build`
 
-```python
-# ❌ BAD — claims work that did not run
-analysis_status = "completed"
+## Local tools
 
-# ✅ GOOD
-analysis_status = "not_run"
-```
+This repository has no git remote, so Origin cannot see it. Use Graphify only when `graphify-out/` exists. Playwright can set a file input; the Cursor browser cannot.

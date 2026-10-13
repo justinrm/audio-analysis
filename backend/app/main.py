@@ -134,6 +134,9 @@ class AxisDefinitions(BaseModel):
 class ReviewMarker(BaseModel):
     time_s: float
     label: str
+    kind: str = "event"
+    value: str | None = None
+    caveat: str | None = None
 
 
 class SummaryItem(BaseModel):

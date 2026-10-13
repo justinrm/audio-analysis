@@ -225,6 +225,25 @@ select {
   height: 28rem;
 }
 
+.markers {
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.markers li {
+  margin-top: 0.35rem;
+}
+
+.markers button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
 .transport {
   display: flex;
   flex-wrap: wrap;

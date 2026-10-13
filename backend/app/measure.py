@@ -1,4 +1,4 @@
-"""Pure measurements for one WAV. Constants are versioned as m1-v1.
+"""Pure measurements for one WAV. Constants are versioned as m1-v2.
 
 Legacy audit math is the source of the window sizes. Decoding scales each
 integer PCM width by its own full scale. The old unconditional /2**31 scale
@@ -20,10 +20,13 @@ from pathlib import Path
 import numpy as np
 from scipy import ndimage, signal
 
-ALGORITHM_VERSION = "m1-v1"
+ALGORITHM_VERSION = "m1-v2"
 PARAMS = {
     "welch_nperseg": 8192,
     "envelope_s": 0.1,
+    "envelope_buckets": 4000,
+    "overview_buckets": 250,
+    "region_count": 4,
     "rms_s": 1.0,
     "downsample": 4,
     "rhythm_nperseg": 1024,
@@ -163,7 +166,60 @@ def levels(audio: Decoded) -> dict:
         "rms_1s_db": rms_db,
         "rms_100ms_t": env_t,
         "rms_100ms_db": env_db,
+        "envelope": minmax_envelope(samples, audio.sample_rate, PARAMS["envelope_buckets"]),
+        "overview": minmax_envelope(samples, audio.sample_rate, PARAMS["overview_buckets"]),
     }
+
+
+def minmax_envelope(samples: np.ndarray, rate: int, limit: int) -> dict:
+    """Min/max of the master inside equal sample buckets. Not a sample trace."""
+    count = max(1, min(int(limit), samples.shape[0]))
+    edges = np.linspace(0, samples.shape[0], count + 1, dtype=int)
+    channel_min = samples.min(axis=1)
+    channel_max = samples.max(axis=1)
+    lows: list[float] = []
+    highs: list[float] = []
+    times: list[float] = []
+    for start, stop in itertools.pairwise(edges):
+        if stop <= start:
+            continue
+        lows.append(finite(float(channel_min[start:stop].min())))
+        highs.append(finite(float(channel_max[start:stop].max())))
+        times.append(finite(((start + stop) / 2) / rate))
+    return {
+        "t": times,
+        "min": lows,
+        "max": highs,
+        "buckets": len(times),
+        "bucket_s": finite(samples.shape[0] / rate / max(len(times), 1)),
+    }
+
+
+def region_deltas(times, values, duration: float, parts: int) -> list[dict]:
+    """Mean level in equal-duration windows, minus the mean of the same series."""
+    axis = np.asarray(times, dtype=float)
+    series = np.asarray(values, dtype=float)
+    usable = np.isfinite(series)
+    if parts < 1 or duration <= 0 or not np.any(usable):
+        return []
+    baseline = float(np.mean(series[usable]))
+    rows = []
+    for index in range(parts):
+        start = duration * index / parts
+        end = duration * (index + 1) / parts
+        inside = usable & (axis >= start) & (axis < end if index + 1 < parts else axis <= end)
+        if not np.any(inside):
+            continue
+        level = float(np.mean(series[inside]))
+        rows.append(
+            {
+                "start_s": finite(start),
+                "end_s": finite(end),
+                "level": finite(level),
+                "delta": finite(level - baseline),
+            }
+        )
+    return rows
 
 
 def _nperseg(length: int, requested: int) -> int:
@@ -454,30 +510,53 @@ def rhythm(audio: Decoded) -> dict:
         onset = np.maximum(onset - ndimage.median_filter(onset, size=window), 0)
     onset_t = times[1:]
     dt = float(onset_t[1] - onset_t[0]) if onset_t.size > 1 else 0.0
-    candidates = _pulse_candidates(onset, dt) if dt > 0 else []
+    candidates, hypotheses = _pulse_candidates(onset, dt) if dt > 0 else ([], [])
     return {
         "candidates": candidates,
+        "hypotheses": hypotheses,
         "onset_t": onset_t,
         "onset": onset,
         "sample_rate": rate,
     }
 
 
-def _pulse_candidates(onset: np.ndarray, dt: float) -> list[dict]:
+def _pulse_candidates(onset: np.ndarray, dt: float) -> tuple[list[dict], list[dict]]:
     centered = onset - float(onset.mean())
     if float(np.max(np.abs(centered))) < 1e-8:
-        return []
+        return [], []
     acf = signal.correlate(centered, centered, mode="full", method="fft")[len(centered) - 1 :]
     acf = acf / np.maximum(np.arange(len(centered), 0, -1), 1)
     acf = acf / max(float(acf[0]), 1e-12)
     lo = max(1, int(60 / 200 / dt))
     hi = min(len(acf) - 1, int(60 / 45 / dt))
     if hi <= lo:
-        return []
+        return [], []
     peaks, _ = signal.find_peaks(acf[lo:hi], distance=3)
     peaks = peaks + lo
     peaks = sorted(peaks, key=lambda index: float(acf[index]), reverse=True)[:6]
-    return [{"bpm": finite(60 / (index * dt)), "acf": finite(float(acf[index]))} for index in peaks]
+    candidates = [
+        {"bpm": finite(60 / (index * dt)), "acf": finite(float(acf[index]))} for index in peaks
+    ]
+    if not peaks:
+        return [], []
+    hypotheses = []
+    primary = peaks[0]
+    for relation, factor in (("half-time", 2.0), ("double-time", 0.5)):
+        target = primary * factor
+        if target < 1 or target >= len(acf):
+            continue
+        nearest = min(peaks, key=lambda index: abs(index - target))
+        if nearest == primary or abs(nearest - target) > max(2.0, 0.15 * target):
+            continue
+        hypotheses.append(
+            {
+                "relation": relation,
+                "bpm": finite(60 / (nearest * dt)),
+                "acf": finite(float(acf[nearest])),
+                "provenance": "autocorrelation-peak",
+            }
+        )
+    return candidates, hypotheses
 
 
 def tonality(audio: Decoded) -> dict:

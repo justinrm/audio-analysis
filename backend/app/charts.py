@@ -14,6 +14,7 @@ from app.measure import (
     levels,
     measure_loudness,
     oversampled_peak,
+    region_deltas,
     rhythm,
     spectrogram,
     stereo,
@@ -78,6 +79,16 @@ def _failed(kind: str, exc: Exception) -> dict:
     return document
 
 
+def _marker(time_s: float, kind: str, label: str, value: str, caveat: str) -> dict:
+    return {
+        "time_s": float(time_s),
+        "kind": kind,
+        "label": label,
+        "value": value,
+        "caveat": caveat,
+    }
+
+
 def _summary(label: str, value: str) -> dict:
     return {"label": label, "value": value}
 
@@ -129,20 +140,37 @@ def _require(shared: dict, name: str):
 
 def build_t01(audio: Decoded, shared: dict) -> dict:
     data = _require(shared, "levels")
+    envelope = data["envelope"]
+    overview = data["overview"]
     document = _base(
         "T01",
         "ready",
         "measured",
-        "frame-rms-v1",
+        "frame-rms+master-minmax-envelope-v1",
         [
-            "100 ms and 1 s RMS are frame powers, not a sample-accurate waveform.",
-            "A single-sample transient can sit between plotted frames. The numeric sample peak is listed separately.",
+            "Envelope traces are min and max of the master inside equal buckets.",
+            (
+                f"The detail envelope uses {envelope['buckets']} buckets "
+                f"({envelope['bucket_s'] * 1000:.1f} ms). "
+                f"The overview uses {overview['buckets']} wider buckets "
+                f"({overview['bucket_s'] * 1000:.1f} ms). Zoom uses the detail buckets."
+            ),
+            "A bucket max is not the exact sample. The sample-peak marker is the exact sample.",
+            "100 ms and 1 s RMS are frame powers, not the waveform.",
             "The transport preview is a separate playback envelope, not this chart.",
         ],
     )
     document["sample_rate"] = audio.sample_rate
-    document["hop_s"] = 0.1
-    document["axis_definitions"] = {"x": "Time (s)", "y": "dBFS", "y_scale": "linear"}
+    document["hop_s"] = envelope["bucket_s"]
+    document["axis_definitions"] = {"x": "Time (s)", "y": "Amplitude or dBFS", "y_scale": "linear"}
+    document["series"]["lines"].extend(
+        [
+            _line("Envelope max", envelope["t"], envelope["max"], "amplitude"),
+            _line("Envelope min", envelope["t"], envelope["min"], "amplitude"),
+            _line("Overview envelope max", overview["t"], overview["max"], "amplitude"),
+            _line("Overview envelope min", overview["t"], overview["min"], "amplitude"),
+        ]
+    )
     if len(data["rms_100ms_t"]):
         document["series"]["lines"].append(
             _line("100 ms RMS", data["rms_100ms_t"], data["rms_100ms_db"], "dBFS")
@@ -156,12 +184,17 @@ def build_t01(audio: Decoded, shared: dict) -> dict:
         _summary("Sample peak time", f"{data['sample_peak_time_s']:.3f} s"),
         _summary("Whole-file RMS", f"{data['rms_dbfs']:.2f} dBFS"),
         _summary("Crest factor", f"{data['crest_db']:.2f} dB"),
+        _summary("Detail buckets", str(envelope["buckets"])),
+        _summary("Overview buckets", str(overview["buckets"])),
     ]
     document["review_markers"] = [
-        {
-            "time_s": data["sample_peak_time_s"],
-            "label": f"sample peak channel {data['sample_peak_channel']}",
-        }
+        _marker(
+            data["sample_peak_time_s"],
+            "sample_peak",
+            f"sample peak channel {data['sample_peak_channel']}",
+            f"{data['sample_peak_dbfs']:.2f} dBFS",
+            "Exact sample on the master. Not a reconstructed true peak and not an audible defect.",
+        )
     ]
     document["time_start_s"] = 0.0
     document["time_end_s"] = audio.samples.shape[0] / audio.sample_rate
@@ -212,8 +245,45 @@ def build_t02(audio: Decoded, shared: dict) -> dict:
     if loud["true_peak_dbtp"] is not None:
         summary.append(_summary("FFmpeg true peak", f"{loud['true_peak_dbtp']:.1f} dBTP"))
     document["summary"] = summary
+    regions = _regions(level, duration)
+    if regions:
+        document["series"]["bars"] = [
+            {
+                "label": f"{item['start_s']:.1f}–{item['end_s']:.1f} s",
+                "value": item["delta"],
+            }
+            for item in regions
+        ]
+        document["summary"].extend(
+            _summary(
+                f"Window {item['start_s']:.1f}–{item['end_s']:.1f} s",
+                f"{item['delta']:+.2f} dB vs file mean",
+            )
+            for item in regions
+        )
+        document["caveats"].append(
+            "Windows are equal slices of the file. The bar is mean 1 s RMS, or 100 ms RMS "
+            "when the file has fewer than two 1 s frames, minus the mean of that same series. "
+            "These are analysis windows, not verses, choruses, or emotional sections."
+        )
+    else:
+        document["caveats"].append("Not enough RMS frames for a region comparison.")
     document["time_end_s"] = duration
     return document
+
+
+def _regions(level: dict, duration: float) -> list[dict]:
+    parts = 4 if duration >= 4 else 2 if duration >= 1 else 0
+    if parts == 0:
+        return []
+    times = level["rms_1s_t"]
+    values = level["rms_1s_db"]
+    if len(times) < 2:
+        times = level["rms_100ms_t"]
+        values = level["rms_100ms_db"]
+    if len(times) < 2:
+        return []
+    return region_deltas(times, values, duration, parts)
 
 
 def build_t03(audio: Decoded, shared: dict) -> dict:
@@ -279,21 +349,28 @@ def build_t04(audio: Decoded, shared: dict) -> dict:
         f"stft-magnitude-nperseg-{data['nperseg']}-v1",
         [
             "Color is magnitude in dB relative to the track median, then averaged into display bins.",
-            "Band traces are bass, body, presence, and air. They are not vocal or instrument tracks.",
+            "The frequency axis is linearly spaced FFT bins, averaged into at most 96 rows. It is not a log-frequency scale.",
+            "Band traces are bass 20–250 Hz, body 250–2000 Hz, presence 2000–5000 Hz, and air 5000 Hz to Nyquist. They are not vocal or instrument tracks.",
+            "Averaging neighboring bins can lower a narrow peak. It does not move energy above Nyquist.",
         ],
     )
-    document["axis_definitions"] = {"x": "Time (s)", "y": "Frequency (Hz)", "y_scale": "log"}
+    document["axis_definitions"] = {"x": "Time (s)", "y": "Frequency (Hz)", "y_scale": "linear"}
     document["hop_s"] = data["nperseg"] / audio.sample_rate / 2
     document["series"]["heatmap"] = {
         "x": [float(value) for value in data["times"]],
         "y": [float(value) for value in data["freqs"]],
         "z": [[float(value) for value in row] for row in data["db"]],
     }
+    document["summary"] = [
+        _summary("Frequency scale", "linear FFT bins"),
+        _summary("Nyquist", f"{audio.sample_rate / 2:.0f} Hz"),
+        _summary("Display rows", str(len(data["freqs"]))),
+    ]
     for item in data["coarse"]:
         document["series"]["lines"].append(
             _line(item["name"], data["coarse_t"], item["db"], "dB rel. median")
         )
-    document["summary"] = [_summary(item["name"], "time trace") for item in data["coarse"]]
+    document["summary"].extend(_summary(item["name"], "time trace") for item in data["coarse"])
     document["time_end_s"] = audio.samples.shape[0] / audio.sample_rate
     return document
 
@@ -366,12 +443,25 @@ def build_t06(audio: Decoded, shared: dict) -> dict:
     document["series"]["bars"] = [
         {"label": f"{item['bpm']:.1f} BPM", "value": item["acf"]} for item in data["candidates"]
     ]
+    for item in data["hypotheses"]:
+        document["series"]["bars"].append(
+            {"label": f"{item['relation']} {item['bpm']:.1f} BPM", "value": item["acf"]}
+        )
     if data["candidates"]:
         top = data["candidates"][0]["bpm"]
         document["caveats"].append(
-            f"The strongest candidate is {top:.1f} BPM. "
-            f"Half-time and double-time hypotheses would be {top / 2:.1f} and {top * 2:.1f} BPM."
+            f"The strongest autocorrelation peak is {top:.1f} BPM. "
+            "It is a pulse estimate, not a verified tempo, meter, beat grid, or groove."
         )
+        if data["hypotheses"]:
+            document["caveats"].append(
+                "Half-time and double-time bars are other autocorrelation peaks near twice or "
+                "half that period. They are not made by multiplying the displayed tempo."
+            )
+        else:
+            document["caveats"].append(
+                "No autocorrelation peak was found near half or double the strongest period."
+            )
         document["summary"] = [
             _summary(item["label"], f"autocorrelation {item['value']:.3f}")
             for item in document["series"]["bars"]
@@ -424,7 +514,14 @@ def build_t08(audio: Decoded, shared: dict) -> dict:
     document["hop_s"] = 2.0
     document["series"]["lines"].append(_line("Novelty", data["times"], data["novelty"], "score"))
     document["review_markers"] = [
-        {"time_s": time, "label": "provisional change"} for time in data["transitions_s"]
+        _marker(
+            time,
+            "provisional_change",
+            "provisional change",
+            "spectral-shape novelty peak",
+            "Not a verified verse, chorus, or section boundary.",
+        )
+        for time in data["transitions_s"]
     ]
     document["summary"] = [
         _summary("Provisional changes", str(len(data["transitions_s"]))),
@@ -475,16 +572,23 @@ def build_t10(audio: Decoded, shared: dict) -> dict:
         for item in data["tails"]
     ]
     document["review_markers"] = [
-        {
-            "time_s": data["oversampled_peak_time_s"],
-            "label": (
-                f"4x reconstructed peak {data['oversampled_peak_dbtp']:.2f} dBTP "
-                f"channel {data['oversampled_peak_channel']}"
-            ),
-        }
+        _marker(
+            data["oversampled_peak_time_s"],
+            "reconstructed_peak",
+            f"4x reconstructed peak channel {data['oversampled_peak_channel']}",
+            f"{data['oversampled_peak_dbtp']:.2f} dBTP",
+            "Listening checkpoint. Not an established click, dropout, or audible clip.",
+        )
     ]
     document["review_markers"].extend(
-        {"time_s": time, "label": "full-scale sample"} for time in data["rail_times_s"][:10]
+        _marker(
+            time,
+            "full_scale_sample",
+            "full-scale sample",
+            "0 dBFS sample",
+            "A sample reached the integer rail. That is not by itself an audible defect.",
+        )
+        for time in data["rail_times_s"][:10]
     )
     document["summary"] = [
         _summary("4x reconstructed peak", f"{data['oversampled_peak_dbtp']:.2f} dBTP"),

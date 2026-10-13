@@ -140,6 +140,9 @@ export type ProjectDetail = {
 export type ReviewMarker = {
   time_s: number;
   label: string;
+  kind?: string;
+  value?: string | null;
+  caveat?: string | null;
 }
 
 export type SummaryItem = {

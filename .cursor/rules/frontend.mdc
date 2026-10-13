@@ -1,23 +1,25 @@
 ---
-description: Frontend rules for the analyzer UI and generated API types
+description: Frontend rules for playback, chart rendering, and generated API types
 globs: frontend/**
 alwaysApply: false
 ---
 
 # Frontend
 
-React and TypeScript. Specs: `docs/01_TECHNICAL_MVP_SPEC.md`, `docs/03_CURSOR_AGENT_FIRST_SESSION.md`, `docs/04_TECHNICAL_CHART_REQUIREMENTS.md`.
+React 19 and TypeScript. Product contract: `docs/01_TECHNICAL_MVP_SPEC.md` and `docs/04_TECHNICAL_CHART_REQUIREMENTS.md`.
 
 - Accessible controls, visible focus, and a layout that stacks on a narrow viewport.
-- WaveSurfer plays the streamed media URL plus precomputed peaks. That preview is not chart T01.
+- WaveSurfer plays the streamed playback URL plus `playback_minmax_envelope_v1` peaks. That preview is not chart T01.
+- Render charts from the API chart document with ECharts. Do not compute loudness, spectra, or peaks in the browser. Use the document's units, axis scale, and time values. Seek only when the x-axis is time.
+- Show chart `status` (`not_run`, `ready`, `not_available`, `failed`) as that status. Show `evidence_class` separately. Do not turn one into the other.
 - Import API shapes from generated OpenAPI types in `frontend/src/api/`. Do not hand-maintain a second copy.
-- Technical Analysis and Lyrics & Inspiration are both first-class. Album QC stays an honest empty state until its milestone.
-- Never fabricate analysis series, peaks, progress, or metrics. Not-run stays not-run.
+- Lyrics stay an empty state until text upload exists. Album QC stays an empty state until comparison exists. Do not invent series, peaks, progress, or metrics.
+- Extend Vitest when a change would hide a wrong chart, status, or evidence class. A style or copy tweak does not need a new test.
 
 ```tsx
-// ❌ BAD
-setProgress(0.4); // nothing is analyzing
+// BAD
+series: syntheticLoudness(duration)
 
-// ✅ GOOD
-setNotice("Analysis is not available in this version.");
+// GOOD
+<ChartView chart={document} onSeek={seek} />
 ```

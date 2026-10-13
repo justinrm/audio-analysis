@@ -54,6 +54,9 @@ def write_png(path: Path, document: dict) -> None:
         if positive:
             ax.set_xscale("log")
     ax.set_title(document["title"])
+    if str((document.get("axis_definitions") or {}).get("x", "")).lower().startswith("time"):
+        for marker in document.get("review_markers") or []:
+            ax.axvline(marker["time_s"], color="#b08d57", linewidth=0.6)
     if series.get("lines"):
         ax.legend(facecolor="#1d242d", edgecolor="#3a4451", labelcolor="#e6e0d4", fontsize=8)
     fig.tight_layout()

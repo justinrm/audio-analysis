@@ -108,7 +108,7 @@ def _evidence(audio, charts: dict, asset_id: str, metrics: dict) -> dict:
         metrics.get("sample_peak_dbfs"),
         "dBFS",
         "measured",
-        "sample-peak:m1-v1",
+        "sample-peak:" + ALGORITHM_VERSION,
         "Sample peak is not reconstructed true peak.",
         "high",
     )
@@ -117,7 +117,7 @@ def _evidence(audio, charts: dict, asset_id: str, metrics: dict) -> dict:
         metrics.get("rms_dbfs"),
         "dBFS",
         "measured",
-        "rms:m1-v1",
+        "rms:" + ALGORITHM_VERSION,
         "RMS is not loudness.",
         "high",
     )
@@ -127,7 +127,7 @@ def _evidence(audio, charts: dict, asset_id: str, metrics: dict) -> dict:
         loud.get("integrated_lufs"),
         "LUFS",
         "measured",
-        "ffmpeg-ebur128:m1-v1",
+        "ffmpeg-ebur128:" + ALGORITHM_VERSION,
         "EBU R128 integrated loudness.",
         "high",
     )
@@ -136,7 +136,7 @@ def _evidence(audio, charts: dict, asset_id: str, metrics: dict) -> dict:
         loud.get("lra_lu"),
         "LU",
         "measured",
-        "ffmpeg-ebur128:m1-v1",
+        "ffmpeg-ebur128:" + ALGORITHM_VERSION,
         "Loudness range is not crest factor.",
         "high",
     )
@@ -145,7 +145,7 @@ def _evidence(audio, charts: dict, asset_id: str, metrics: dict) -> dict:
         loud.get("true_peak_dbtp"),
         "dBTP",
         "measured",
-        "ffmpeg-ebur128:m1-v1",
+        "ffmpeg-ebur128:" + ALGORITHM_VERSION,
         "Does not by itself establish audible clipping.",
         "high",
     )
@@ -156,7 +156,7 @@ def _evidence(audio, charts: dict, asset_id: str, metrics: dict) -> dict:
             float(t06["series"]["bars"][0]["label"].split()[0]),
             "BPM",
             "estimated",
-            "onset-autocorr:m1-v1",
+            "onset-autocorr:" + ALGORITHM_VERSION,
             "Not a beat grid. Half-time and double-time remain hypotheses.",
             "low",
         )

@@ -99,9 +99,17 @@ describe("milestone 1 analysis state", () => {
       summary: [{ label: "Integrated loudness", value: "-14.2 LUFS" }],
       series: { lines: [{ name: "Short-term", unit: "LUFS", x: [0, 1], y: [-14.2, -13.5] }], bars: [], heatmap: null },
       axis_definitions: { x: "time (s)", y: "LUFS", y_scale: "linear" },
-      review_markers: [],
+      review_markers: [
+        {
+          time_s: 1.25,
+          kind: "sample_peak",
+          label: "sample peak channel 1",
+          value: "-6.02 dBFS",
+          caveat: "Exact sample on the master. Not an audible defect.",
+        },
+      ],
     }
-    const seen: string[] = []
+    const seen: Array<string | number> = []
     render(
       <TechnicalBoard
         {...idle}
@@ -109,13 +117,16 @@ describe("milestone 1 analysis state", () => {
         chartId="T02"
         document={document}
         onSelect={(id) => seen.push(id)}
+        onSeek={(seconds) => seen.push(seconds)}
       />,
     )
     expect(screen.getByText(/-14\.2 LUFS/)).toBeTruthy()
     expect(screen.getByRole("button", { name: /T03/i }).textContent).toMatch(/failed/)
     expect(screen.queryByRole("progressbar")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: /sample peak/i }))
+    expect(seen).toEqual([1.25])
     fireEvent.click(screen.getByRole("button", { name: /T03/i }))
-    expect(seen).toEqual(["T03"])
+    expect(seen).toEqual([1.25, "T03"])
   })
 
   it("distinguishes a 24-bit master from the playback copy", () => {

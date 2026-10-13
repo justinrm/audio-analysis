@@ -313,7 +313,7 @@ export function Analyzer({ assetId }: { assetId: string }) {
     return () => {
       cancelled = true
     }
-  }, [assetId, job?.status])
+  }, [assetId, job?.status, asset?.analysis_status])
 
   useEffect(() => {
     let cancelled = false
@@ -328,7 +328,7 @@ export function Analyzer({ assetId }: { assetId: string }) {
     return () => {
       cancelled = true
     }
-  }, [assetId, chartId, job?.status])
+  }, [assetId, chartId, job?.status, asset?.analysis_status])
 
   useEffect(() => {
     if (!job || job.status === "completed" || job.status === "failed" || job.status === "canceled") {

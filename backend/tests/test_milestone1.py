@@ -8,12 +8,20 @@ from app.charts import build_t05
 from app.config import Settings
 from app.main import create_app
 from app.measure import (
+    ALGORITHM_VERSION,
     ChartUnavailable,
     correlation,
     decode_wav,
     levels,
+    measure_loudness,
     oversampled_peak,
     parse_ebur128,
+    region_deltas,
+    rhythm,
+    spectrogram,
+    stereo,
+    structure,
+    tonality,
     welch_bands,
 )
 from fastapi.testclient import TestClient
@@ -136,6 +144,10 @@ def test_stereo_correlation_and_mono(tmp_path: Path) -> None:
     assert correlation(flipped_audio.samples[:, 0], flipped_audio.samples[:, 1]) == pytest.approx(
         -1, abs=1e-6
     )
+    same_field = stereo(same_audio)
+    flipped_field = stereo(flipped_audio)
+    assert same_field["side_energy_percent"] < 1
+    assert flipped_field["mono_energy_change_db"] < -20
     with pytest.raises(ChartUnavailable, match="Mono"):
         build_t05(decode_wav(mono), {})
 
@@ -204,17 +216,34 @@ def test_worker_completes_charts_and_keeps_the_master(
     image = client.get(f"/api/assets/{asset_id}/charts/T02/image")
     assert image.status_code == 200
     assert image.content.startswith(b"\x89PNG")
+    waveform = client.get(f"/api/assets/{asset_id}/charts/T01/data").json()
+    names = {line["name"] for line in waveform["series"]["lines"]}
+    assert {"Envelope max", "Envelope min", "Overview envelope max", "100 ms RMS"} <= names
+    assert waveform["review_markers"][0]["kind"] == "sample_peak"
+    assert 0 <= waveform["review_markers"][0]["time_s"] <= 5
+    regions = client.get(f"/api/assets/{asset_id}/charts/T02/data").json()
+    assert any("Window" in item["label"] for item in regions["summary"])
+    metrics = json.loads(
+        (settings.data_root / "analysis" / digest / ALGORITHM_VERSION / "metrics.json").read_text()
+    )
+    assert metrics["algorithm_version"] == ALGORITHM_VERSION
+    assert metrics["loudness"]["integrated_lufs"] == pytest.approx(
+        float(regions["summary"][0]["value"].split()[0])
+    )
     evidence = client.get(f"/api/assets/{asset_id}/evidence")
     assert evidence.status_code == 200
     names = {item["name"] for item in evidence.json()["records"]}
     assert "integrated_lufs" in names
     assert "true_peak_dbtp" in names
-    metrics_path = settings.data_root / "analysis" / digest / "m1-v1" / "metrics.json"
+    metrics_path = settings.data_root / "analysis" / digest / ALGORITHM_VERSION / "metrics.json"
+    evidence_path = settings.data_root / "analysis" / digest / ALGORITHM_VERSION / "evidence.json"
     before = metrics_path.read_bytes()
+    evidence_before = evidence_path.read_bytes()
     cached = client.post(f"/api/assets/{asset_id}/analyze")
     assert cached.status_code == 202
     assert cached.json()["status"] == "completed"
     assert metrics_path.read_bytes() == before
+    assert evidence_path.read_bytes() == evidence_before
     runs = client.app.state.db.execute("SELECT COUNT(*) FROM analysis_runs").fetchone()[0]
     assert runs == 1
     encoded = metrics_path.read_text()
@@ -264,6 +293,120 @@ def test_interrupted_job_can_be_retried(client: TestClient, tmp_path: Path) -> N
     assert retried.status_code == 202
     assert retried.json()["status"] == "queued"
     assert retried.json()["id"] != job_id
+
+
+def test_envelope_keeps_one_full_scale_sample(tmp_path: Path) -> None:
+    path = tmp_path / "spike.wav"
+    samples = [0] * 8000
+    samples[1000] = 32767
+    pcm_wav(path, samples, 8000, 1, 16)
+    measured = levels(decode_wav(path))
+    assert measured["sample_peak_dbfs"] > -0.05
+    assert max(measured["envelope"]["max"]) == pytest.approx(32767 / 32768, abs=1e-4)
+    assert measured["overview"]["buckets"] < measured["envelope"]["buckets"]
+    assert abs(measured["sample_peak_time_s"] - 1000 / 8000) < 0.001
+
+
+def test_region_deltas_compare_equal_windows() -> None:
+    rows = region_deltas([0.5, 1.5, 2.5, 3.5], [0.0, 0.0, 10.0, 10.0], 4.0, 2)
+    assert rows[0]["delta"] == pytest.approx(-5)
+    assert rows[1]["delta"] == pytest.approx(5)
+    assert rows[0]["end_s"] == pytest.approx(2)
+
+
+def test_sine_loudness_tracks_peak_minus_three_db(tmp_path: Path) -> None:
+    # A sine's RMS is 3.01 dB under its peak. K-weighting near 1 kHz is about 0 dB,
+    # so EBU R128 integrated loudness should sit near that RMS. FFmpeg is the meter
+    # this parse uses; the expected value is the sine relationship, not a second meter.
+    # ±1.0 LU allows gating on a 10 s tone.
+    path = tmp_path / "steady.wav"
+    _tone(path, 10.0, 1000, 0.5, 1, 16)
+    audio = decode_wav(path)
+    peak = levels(audio)["sample_peak_dbfs"]
+    loud = measure_loudness(path, timeout_s=30)
+    assert loud["integrated_lufs"] == pytest.approx(peak - 3.0103, abs=1.0)
+    assert loud["true_peak_dbtp"] == pytest.approx(peak, abs=1.0)
+
+
+def test_spectrogram_stays_linear_and_under_nyquist(tmp_path: Path) -> None:
+    path = tmp_path / "band.wav"
+    _tone(path, 2.0, 440, 0.5, 1, 16)
+    audio = decode_wav(path)
+    data = spectrogram(audio)
+    freqs = [float(value) for value in data["freqs"]]
+    assert freqs == sorted(freqs)
+    assert max(freqs) <= audio.sample_rate / 2
+    assert len(freqs) <= 96
+    peak = max(range(len(data["db"])), key=lambda index: max(data["db"][index]))
+    assert abs(freqs[peak] - 440) < 80
+
+
+def test_click_train_pulse_is_deterministic(tmp_path: Path) -> None:
+    path = tmp_path / "clicks.wav"
+    rate = 8000
+    samples = [0] * (rate * 8)
+    step = rate // 2
+    for index in range(0, len(samples), step):
+        samples[index] = 20000
+    pcm_wav(path, samples, rate, 1, 16)
+    audio = decode_wav(path)
+    first = rhythm(audio)
+    assert rhythm(audio)["candidates"] == first["candidates"]
+    assert rhythm(audio)["hypotheses"] == first["hypotheses"]
+    found = [item["bpm"] for item in first["candidates"]]
+    assert any(abs(bpm - target) < 10 for bpm in found for target in (60, 120, 240))
+    for item in first["hypotheses"]:
+        assert item["provenance"] == "autocorrelation-peak"
+        assert item["relation"] in {"half-time", "double-time"}
+
+
+def test_constant_signal_invents_no_tempo(tmp_path: Path) -> None:
+    path = tmp_path / "flat.wav"
+    pcm_wav(path, [1000] * (8000 * 4), 8000, 1, 16)
+    result = rhythm(decode_wav(path))
+    assert result["candidates"] == []
+    assert result["hypotheses"] == []
+
+
+def test_pure_tone_pitch_class_is_stable(tmp_path: Path) -> None:
+    path = tmp_path / "concert.wav"
+    _tone(path, 6.0, 440, 0.4, 1, 16)
+    audio = decode_wav(path)
+    data = tonality(audio)
+    assert tonality(audio)["pitch_class"] == data["pitch_class"]
+    assert all(math.isfinite(value) for value in data["pitch_class"])
+    assert sum(data["pitch_class"]) == pytest.approx(1)
+    loudest = max(range(12), key=lambda index: data["pitch_class"][index])
+    assert data["names"][loudest] == "A"
+
+
+def test_structure_contrast_is_deterministic(tmp_path: Path) -> None:
+    path = tmp_path / "join.wav"
+    rate = 8000
+    half = [
+        int(8000 * math.sin(2 * math.pi * 200 * i / rate)) for i in range(rate * 10)
+    ]
+    other = [
+        int(8000 * math.sin(2 * math.pi * 2000 * i / rate)) for i in range(rate * 10)
+    ]
+    pcm_wav(path, half + other, rate, 1, 16)
+    audio = decode_wav(path)
+    data = structure(audio)
+    assert structure(audio)["novelty"] == data["novelty"]
+    assert math.isfinite(data["similarity"]["z"][0][0])
+    peak = data["times"][max(range(len(data["novelty"])), key=lambda index: data["novelty"][index])]
+    assert abs(peak - 10) < 2.5
+    short = tmp_path / "short.wav"
+    _tone(short, 3.0, 440, 0.2, 1, 16)
+    with pytest.raises(ChartUnavailable):
+        structure(decode_wav(short))
+
+
+def test_spectrum_rejects_a_file_under_256_samples(tmp_path: Path) -> None:
+    path = tmp_path / "tiny.wav"
+    pcm_wav(path, [1000] * 100, 8000, 1, 16)
+    with pytest.raises(ChartUnavailable, match="256"):
+        welch_bands(decode_wav(path))
 
 
 def test_legacy_metrics_remain_a_comparison_target() -> None:
