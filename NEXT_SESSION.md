@@ -1,67 +1,65 @@
 # Next session
 
-Milestone 0 is complete. Stop here. Do not start Milestone 1 until the human accepts this gate.
+Milestone 1 is complete. Stop here. Do not start Milestone 2 until the human accepts this gate.
 
-## What Milestone 0 completed
+## What Milestone 1 completed
 
-- Local-first studio: React/TypeScript on `127.0.0.1:5173`, FastAPI on `127.0.0.1:8000`, SQLite plus files under the data root. No cloud, auth, telemetry, payments, or API keys.
-- Import of 16-bit and 24-bit PCM WAV. The master bytes and SHA-256 stay unchanged. A 24-bit file gets a separate 16-bit playback derivative (`pcm_s16le-triangular-v1`). If FFmpeg fails, the master import still succeeds and `playback_status` is `unavailable`.
-- Content-addressed blobs. The original filename is display-only. Re-importing the same bytes is a cache hit and does not duplicate `project_assets`.
-- Chunked min/max peak envelope for the WaveSurfer transport (`playback_minmax_envelope_v1`). This is a playback preview, not chart T01. No loudness, spectrum, or dynamics are computed.
-- `POST /api/assets/{id}/analyze` returns HTTP 501 and inserts zero jobs. `analysis_status` stays `not_run`. The jobs table and `AnalysisWorker` exist so a later worker can return 202 with `queued|running|completed|failed|canceled`. The worker does not mark anything completed.
-- Library, Analyzer, Album QC, and Settings. Technical categories T01–T10 show not-run. Lyrics & Inspiration says text upload is not in this milestone. Album QC says comparison is not in this milestone. Settings says AI interpretation is off and has no API-key field.
+- Analysis runs in a separate worker (`python -m app.worker`), one job at a time. `POST /api/assets/{id}/analyze` returns 202 and does not measure inside the request. Status words are `queued`, `running`, `completed`, `failed`, and `canceled`. An abandoned `running` job is marked `interrupted` and can be retried.
+- Measurements read the stored master, not the 16-bit playback derivative. Algorithm version `m1-v1`. Results cache by asset hash plus that version. A cache hit returns a completed job and does not rewrite the files.
+- Charts T01–T10. T01–T05 and T10 are measured. T06–T09 are estimated and say so. A mono file makes T05 `not_available`. A file too short for 2 s structure bins makes T08 and T09 `not_available`. One chart failing leaves the others in place.
+- Each ready chart has JSON, a PNG, and a place in `metrics.json` and `evidence.json`. The screen plots server series with ECharts. Clicking a time axis seeks the transport. Switching charts does not remount playback.
+- Legacy `metrics.json` is a schema comparison only. The original WAVs are absent, so there is no numerical parity claim. Decoder scale is 16-bit / 32768 and 24-bit / 8388608.
 
 ## Commands
 
-Backend (from `backend/`):
+From `backend/`, in two terminals:
 
 ```bash
 uv run uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
+uv run python -m app.worker
 ```
 
-Frontend (from `frontend/`):
+From `frontend/`:
 
 ```bash
 pnpm dev
 ```
 
-Open `http://127.0.0.1:5173/`. The default data root is `~/Library/Application Support/AudioReferenceStudio/` unless `ARS_DATA_ROOT` is set. Caps and CORS are in `.env.example`.
+Open `http://127.0.0.1:5173/`. Without the worker, Analyze stays `queued`. The default data root is `~/Library/Application Support/AudioReferenceStudio/` unless `ARS_DATA_ROOT` is set.
 
 Checks:
 
 ```bash
-cd backend && uv run ruff check . && uv run pytest -q
+cd backend && uv run ruff check app tests && uv run pytest -q
 cd frontend && pnpm typecheck && pnpm test && pnpm build
 ```
 
 ## What was tested
 
-- `uv run ruff check .` — all checks passed.
-- `uv run pytest -q` — 13 passed, 1 warning in 0.68s. The warning is Starlette's deprecation of `httpx` in `TestClient` (httpx 0.28.1 stays pinned). Covered: 16-bit and 24-bit metadata, original SHA-256 unchanged after import and after the derivative, float and invalid WAV rejected, hostile filename does not become a path, oversized input rejected, interrupted upload removes the temp file, duplicate import reuses the blob and does not duplicate `project_assets`, range request 206, analyze returns 501 and inserts zero jobs, peaks are finite and min/max-preserving on a known square, derivative failure leaves the master imported with playback unavailable.
-- `pnpm typecheck` (`tsc --noEmit`) — exit 0.
-- `pnpm test` (`vitest run`) — Test Files 1 passed (1), Tests 3 passed (3).
-- `pnpm build` — exit 0 (`tsc --noEmit && vite build`, built in 378ms).
-- Browser on the fresh Vite server: create/open the study, import a synthetic 16-bit WAV through the Import control's change handler, library row (`browser-tone.wav`, 16-bit PCM, 8 kHz, mono, 0:01, `not_run`, `ready`), Open analyzer, WaveSurfer canvas plus stream URL, seek to 0.35s, play (`paused` false, time advanced), pause (time held). Technical T01–T10 not run, only the selected category is current, Analyze shows "Analysis is not implemented. No job was created." with no progress. Lyrics tab, Album QC, and Settings show the honest milestone copy. At 1400px the analyzer is sidebar plus three panes (`240px 528px 272px`). At 480px both the shell and the workspace are one column. Stream requests logged `206 Partial Content`. Analyze logged `501`.
+- `uv run ruff check app tests` — all checks passed.
+- `uv run pytest -q` — 24 passed, 1 warning in 5.43s. The warning is Starlette's deprecation of `httpx` in `TestClient` (httpx 0.28.1 stays pinned). New coverage includes 16/24-bit scale, a 440 Hz band, stereo and mono, oversampled peak above the sample peak, a 5 s worker run (master hash unchanged, T02 and T05 ready, T08 not available, PNG header, cache hit does not rewrite metrics), a failed T03 leaving T02 ready, and interrupted-job retry.
+- `pnpm typecheck` — exit 0.
+- `pnpm test` — Test Files 1 passed (1), Tests 4 passed (4).
+- `pnpm build` — exit 0. Vite warns that the ECharts bundle is over 500 kB.
+- Browser, with the API and worker running: a 5 s 44.1 kHz stereo 16-bit tone (`m1-tone.wav`) analyzed to completion. T01–T07 and T10 ready. T08 and T09 not available. T02 evidence: integrated loudness -6.9 LUFS, sample peak -6.23 dBFS, true peak -6.2 dBTP, with the short-file LRA caveat. No progress bar. Clicking the T01 plot moved the transport to 1.44 s. The same audio element stayed mounted across a chart change. Play ran to the end of the file. Lyrics still says text upload is not in this milestone. At 390 px the workspace is one column and the page does not scroll sideways.
 
 ## What was not tested
 
-- The operating-system file dialog. The browser tools cannot set a file input. Import was exercised by assigning a synthetic WAV to that input and dispatching `change`, which is the same handler as the Import control.
-- A 24-bit file played in the browser. Derivative bytes, hash stability, and "stream the derivative, not the master" are covered by pytest.
-- Listening quality of the triangular dither.
-- A real recording longer than the one-second synthetic tone.
+- The operating-system file dialog. The tone was uploaded through the API into the existing "Reference study" project.
+- A 24-bit master played in the browser during this milestone. Derivative behavior remains covered by the Milestone 0 tests.
+- A click-train tempo or a file long enough for T08 and T09. Those charts are estimated and were not checked against a known BPM or section.
+- Listening quality, or numerical equality with `references/legacy-audit/analysis/metrics.json`.
 
 ## Deferred
 
-Analysis jobs, loudness, RMS, spectrum, stereo, dynamics, chart T01 as a measured series, lyric text upload, sung timing, album comparison, exports, and AI interpretation. Do not add NumPy, SciPy, ECharts, Playwright, Alembic, Redis, Celery, auth, or a model client unless a later approved milestone requires one.
+Lyric text and SRT upload, lyric timing, the five lyricist charts, album comparison, ZIP export, and AI interpretation. Do not add Playwright, Alembic, Redis, Celery, auth, or a model client unless a later approved milestone requires one.
 
 ## Risks
 
-- The verification import wrote `browser-tone.wav` into the default Application Support data root (project "Reference study"). That directory is outside git. Delete the folder if a clean first launch is wanted.
-- Playback peaks are a preview envelope. Treating them as T01 would mix a display downsample with a measured chart.
-- `GET /api/jobs/{id}` 404s until a real worker creates rows. Do not invent a completed job.
+- The verification tone `m1-tone.wav` is in the default Application Support data root, project "Reference study", beside the earlier `browser-tone.wav`. That directory is outside git.
+- Humans must start the worker or Analyze never leaves `queued`.
+- T06 tempo and T07 key names are estimates. Do not describe them as a verified grid or key.
 
-## Smallest Milestone 1 target
+## Smallest Milestone 2 target
 
-Per-file FFmpeg loudness plus RMS/energy from the legacy math, rendered as the first real Technical Analysis chart **T02** through a canonical chart registry.
-
-Do not port the legacy scripts. Do not copy song names or report constants from `references/legacy-audit/`. Do not build T01 or T03–T10 in that first slice. Keep evidence labeled measured, estimated, textual, interpretive, or unknown, and do not invent audible-defect verdicts.
+TXT and SRT upload with timing provenance: plain text stays unplaced, and SRT cues keep their own times. Do not guess sung timestamps. Do not add another DSP chart.

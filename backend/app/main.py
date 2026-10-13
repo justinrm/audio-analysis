@@ -26,8 +26,11 @@ from app.audio import (
     probe_wav,
     write_pcm16_derivative,
 )
+from app.charts import KINDS, not_run
 from app.config import Settings, load_settings
 from app.db import asset_dict, connect, project_dict
+from app.measure import ALGORITHM_VERSION, PARAMS_HASH
+from app.pipeline import analysis_dir, empty_registry, public_summary
 from app.worker import AnalysisWorker
 
 
@@ -47,7 +50,7 @@ class Health(BaseModel):
     status: str
     database: str
     ffmpeg_version: str
-    analysis: Literal["not_implemented"]
+    analysis: Literal["available"]
 
 
 class ProjectCreate(BaseModel):
@@ -71,7 +74,7 @@ class Asset(BaseModel):
     sample_rate: int
     channels: int
     subtype: Literal["pcm_16", "pcm_24"]
-    analysis_status: Literal["not_run"]
+    analysis_status: Literal["not_run", "queued", "running", "completed", "failed"]
     playback_status: Literal["ready", "unavailable"]
     created_at: str
 
@@ -96,6 +99,82 @@ class Peaks(BaseModel):
     channels: int
     method_id: str
     buckets: list[PeakBucket]
+
+
+class ChartLine(BaseModel):
+    name: str
+    unit: str
+    x: list[float]
+    y: list[float | None]
+
+
+class ChartBar(BaseModel):
+    label: str
+    value: float
+
+
+class ChartHeatmap(BaseModel):
+    x: list[float]
+    y: list[float]
+    z: list[list[float]]
+
+
+class ChartSeries(BaseModel):
+    lines: list[ChartLine] = []
+    bars: list[ChartBar] = []
+    heatmap: ChartHeatmap | None = None
+
+
+class AxisDefinitions(BaseModel):
+    x: str = ""
+    y: str = ""
+    y_scale: Literal["linear", "log"] = "linear"
+
+
+class ReviewMarker(BaseModel):
+    time_s: float
+    label: str
+
+
+class SummaryItem(BaseModel):
+    label: str
+    value: str
+
+
+class ChartSummary(BaseModel):
+    chart_kind: str
+    status: Literal["not_run", "ready", "not_available", "failed"]
+    title: str
+    evidence_class: str
+    method_id: str
+    method_version: str
+    caveats: list[str]
+    summary: list[SummaryItem]
+    not_available_reason: str | None = None
+    error: str | None = None
+    data_url: str
+    png_url: str | None = None
+
+
+class ChartList(BaseModel):
+    charts: list[ChartSummary]
+
+
+class ChartDocument(BaseModel):
+    model_config = {"extra": "allow"}
+    chart_kind: str
+    status: Literal["not_run", "ready", "not_available", "failed"]
+    title: str
+    evidence_class: str
+    method_id: str
+    method_version: str
+    caveats: list[str]
+    summary: list[SummaryItem]
+    series: ChartSeries
+    axis_definitions: AxisDefinitions
+    review_markers: list[ReviewMarker]
+    not_available_reason: str | None = None
+    error: str | None = None
 
 
 class Job(BaseModel):
@@ -203,7 +282,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Audio Reference Studio")
     app.state.settings = settings
     app.state.db = connection
-    app.state.worker = AnalysisWorker(connection)
+    app.state.worker = AnalysisWorker(connection, settings)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.cors_origin],
@@ -230,7 +309,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             status="ok" if database == "ok" else "degraded",
             database=database,
             ffmpeg_version=ffmpeg_version(),
-            analysis="not_implemented",
+            analysis="available",
         )
 
     @app.post("/api/projects", response_model=Project)
@@ -391,17 +470,128 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         payload = json.loads(cache.read_text())
         return payload
 
-    @app.post("/api/assets/{asset_id}/analyze", response_model=ErrorBody, status_code=501)
-    def analyze(asset_id: str) -> JSONResponse:
-        _require_asset(connection, asset_id)
-        app.state.worker.run_available()
-        return JSONResponse(
-            status_code=501,
-            content={
-                "error": "not_implemented",
-                "message": "Analysis is not implemented. No job was created.",
-            },
+    def _job_dict(row: sqlite3.Row) -> dict:
+        return {
+            "id": row["id"],
+            "asset_id": row["asset_id"],
+            "status": row["status"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "error": row["error"],
+        }
+
+    def _chart_file(asset: sqlite3.Row, kind: str) -> dict:
+        if kind not in KINDS:
+            raise AppError(404, "not_found", "Unknown chart.")
+        path = analysis_dir(settings.data_root, asset["sha256"]) / f"{kind}.json"
+        if not path.is_file():
+            return not_run(kind)
+        return json.loads(path.read_text())
+
+    @app.post("/api/assets/{asset_id}/analyze", response_model=Job, status_code=202)
+    def analyze(asset_id: str) -> dict:
+        asset = _require_asset(connection, asset_id)
+        now = _now()
+        final = analysis_dir(settings.data_root, asset["sha256"])
+        cached = connection.execute(
+            """
+            SELECT id FROM analysis_runs
+            WHERE asset_id = ? AND algorithm_version = ? AND params_hash = ? AND status = 'completed'
+            """,
+            (asset_id, ALGORITHM_VERSION, PARAMS_HASH),
+        ).fetchone()
+        if cached is not None and (final / "metrics.json").is_file():
+            job_id = str(uuid.uuid4())
+            connection.execute(
+                """
+                INSERT INTO jobs (id, asset_id, status, created_at, updated_at, error)
+                VALUES (?, ?, 'completed', ?, ?, NULL)
+                """,
+                (job_id, asset_id, now, now),
+            )
+            connection.execute(
+                "UPDATE assets SET analysis_status = 'completed' WHERE id = ?",
+                (asset_id,),
+            )
+            connection.commit()
+            row = connection.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+            return _job_dict(row)
+        active = connection.execute(
+            """
+            SELECT * FROM jobs
+            WHERE asset_id = ? AND status IN ('queued', 'running')
+            ORDER BY created_at DESC LIMIT 1
+            """,
+            (asset_id,),
+        ).fetchone()
+        if active is not None:
+            return _job_dict(active)
+        job_id = str(uuid.uuid4())
+        connection.execute(
+            """
+            INSERT INTO jobs (id, asset_id, status, created_at, updated_at, error)
+            VALUES (?, ?, 'queued', ?, ?, NULL)
+            """,
+            (job_id, asset_id, now, now),
         )
+        connection.execute(
+            "UPDATE assets SET analysis_status = 'queued' WHERE id = ?",
+            (asset_id,),
+        )
+        connection.commit()
+        row = connection.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        return _job_dict(row)
+
+    @app.get("/api/assets/{asset_id}/charts", response_model=ChartList)
+    def list_charts(asset_id: str) -> dict:
+        asset = _require_asset(connection, asset_id)
+        final = analysis_dir(settings.data_root, asset["sha256"])
+        if not (final / "metrics.json").is_file():
+            return {"charts": empty_registry(asset_id)}
+        charts = []
+        for kind in KINDS:
+            document = json.loads((final / f"{kind}.json").read_text())
+            charts.append(public_summary(document, asset_id))
+        return {"charts": charts}
+
+    @app.get("/api/assets/{asset_id}/charts/{kind}/data", response_model=ChartDocument)
+    def chart_data(asset_id: str, kind: str) -> dict:
+        asset = _require_asset(connection, asset_id)
+        document = _chart_file(asset, kind)
+        if "series" not in document:
+            document = {
+                **document,
+                "series": {"lines": [], "bars": [], "heatmap": None},
+                "axis_definitions": {"x": "", "y": "", "y_scale": "linear"},
+                "review_markers": [],
+            }
+        return document
+
+    @app.get("/api/assets/{asset_id}/charts/{kind}/image")
+    def chart_image(asset_id: str, kind: str) -> FileResponse:
+        asset = _require_asset(connection, asset_id)
+        if kind not in KINDS:
+            raise AppError(404, "not_found", "Unknown chart.")
+        path = analysis_dir(settings.data_root, asset["sha256"]) / f"{kind}.png"
+        if not path.is_file():
+            raise AppError(404, "png_unavailable", "No PNG was written for this chart.")
+        return FileResponse(path, media_type="image/png")
+
+    @app.get("/api/assets/{asset_id}/metrics")
+    def metrics(asset_id: str) -> dict:
+        asset = _require_asset(connection, asset_id)
+        path = analysis_dir(settings.data_root, asset["sha256"]) / "metrics.json"
+        if not path.is_file():
+            raise AppError(404, "not_ready", "Analysis has not been run.")
+        return json.loads(path.read_text())
+
+    @app.get("/api/assets/{asset_id}/evidence")
+    def evidence(asset_id: str) -> dict:
+        asset = _require_asset(connection, asset_id)
+        path = analysis_dir(settings.data_root, asset["sha256"]) / "evidence.json"
+        if not path.is_file():
+            raise AppError(404, "not_ready", "Analysis has not been run.")
+        return json.loads(path.read_text())
 
     @app.get("/api/jobs/{job_id}", response_model=Job)
     def get_job(job_id: str) -> dict:

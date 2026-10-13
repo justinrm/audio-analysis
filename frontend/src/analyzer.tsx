@@ -1,20 +1,48 @@
 import { Pause, Play } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import WaveSurfer from "wavesurfer.js"
 import { api, streamUrl } from "./api/client"
-import type { Asset, Peaks } from "./api/types"
+import type { Asset, ChartDocument, ChartSummary, Job, Peaks } from "./api/types"
+import { ChartView } from "./chart"
 import { clock, playbackCaption, TECHNICAL, toWavePeaks } from "./catalog"
 
+const STATUS_LABEL: Record<string, string> = {
+  not_run: "not run",
+  not_available: "not available",
+  ready: "ready",
+  failed: "failed",
+  queued: "queued",
+  running: "running",
+  completed: "completed",
+  canceled: "canceled",
+}
+
 export function TechnicalBoard({
+  charts,
+  chartId,
+  document,
+  jobStatus,
   notice,
   onAnalyze,
+  onSelect,
+  onSeek,
 }: {
+  charts: ChartSummary[]
+  chartId: string
+  document: ChartDocument | null
+  jobStatus: string
   notice: string
   onAnalyze: () => void
+  onSelect: (chartId: string) => void
+  onSeek: (seconds: number) => void
 }) {
   const [tab, setTab] = useState<"technical" | "lyrics">("technical")
-  const [chartId, setChartId] = useState(TECHNICAL[0].id)
-  const chart = TECHNICAL.find((item) => item.id === chartId) ?? TECHNICAL[0]
+  const rows = TECHNICAL.map((item) => {
+    const live = charts.find((chart) => chart.chart_kind === item.id)
+    return { id: item.id, title: live?.title || item.title, status: live?.status ?? "not_run" }
+  })
+  const selected = rows.find((row) => row.id === chartId) ?? rows[0]
+  const active = document?.chart_kind === selected.id ? document : null
 
   return (
     <section>
@@ -34,17 +62,17 @@ export function TechnicalBoard({
       <div className="workspace">
         {tab === "technical" ? (
           <div role="tabpanel">
-            {TECHNICAL.map((item) => (
+            {rows.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 className="category"
-                aria-current={item.id === chart.id ? "true" : undefined}
-                onClick={() => setChartId(item.id)}
+                aria-current={item.id === selected.id ? "true" : undefined}
+                onClick={() => onSelect(item.id)}
               >
                 {item.id} {item.title}
                 <br />
-                <small>not run</small>
+                <small>{STATUS_LABEL[item.status] ?? item.status}</small>
               </button>
             ))}
           </div>
@@ -58,10 +86,18 @@ export function TechnicalBoard({
           {tab === "technical" ? (
             <>
               <h2 className="m-0 font-serif text-3xl font-medium">
-                {chart.id} {chart.title}
+                {selected.id} {selected.title}
               </h2>
-              <p>{chart.note}</p>
-              <p>Status: not run</p>
+              <p>Status: {STATUS_LABEL[active?.status ?? selected.status] ?? selected.status}</p>
+              {jobStatus ? <p>Analysis {STATUS_LABEL[jobStatus] ?? jobStatus}.</p> : null}
+              {active?.status === "ready" ? <ChartView chart={active} onSeek={onSeek} /> : null}
+              {active && active.status !== "ready" && active.status !== "not_run" ? (
+                <p>{active.not_available_reason || active.error}</p>
+              ) : null}
+              {(active?.status ?? selected.status) === "not_run" ? (
+                <p>Not run. Nothing has been measured for this recording.</p>
+              ) : null}
+              {selected.status !== "not_run" && !active ? <p>Loading this chart.</p> : null}
               <button type="button" className="action" onClick={onAnalyze}>
                 Analyze
               </button>
@@ -80,14 +116,39 @@ export function TechnicalBoard({
         </div>
         <aside>
           <h2 className="m-0 font-serif text-2xl font-medium">Evidence</h2>
-          <p>No evidence yet.</p>
+          {tab === "technical" && active && active.status !== "not_run" ? (
+            <>
+              <p>{active.evidence_class}</p>
+              <p>
+                {active.method_id} {active.method_version}
+              </p>
+              {active.summary.map((item) => (
+                <p key={item.label}>
+                  {item.label}: {item.value}
+                </p>
+              ))}
+              {active.caveats.map((item) => (
+                <p key={item}>{item}</p>
+              ))}
+            </>
+          ) : (
+            <p>No evidence yet.</p>
+          )}
         </aside>
       </div>
     </section>
   )
 }
 
-function Transport({ asset, peaks }: { asset: Asset; peaks: Peaks }) {
+function Transport({
+  asset,
+  peaks,
+  seekRef,
+}: {
+  asset: Asset
+  peaks: Peaks
+  seekRef: { current: (seconds: number) => void }
+}) {
   const host = useRef<HTMLDivElement>(null)
   const player = useRef<WaveSurfer | null>(null)
   const [time, setTime] = useState(0)
@@ -117,6 +178,12 @@ function Transport({ asset, peaks }: { asset: Asset; peaks: Peaks }) {
       normalize: false,
     })
     player.current = wave
+    seekRef.current = (seconds: number) => {
+      if (duration <= 0) {
+        return
+      }
+      wave.setTime(Math.min(Math.max(seconds, 0), duration))
+    }
     const unsubscribers = [
       wave.on("timeupdate", (value) => setTime(value)),
       wave.on("play", () => setPlaying(true)),
@@ -125,11 +192,12 @@ function Transport({ asset, peaks }: { asset: Asset; peaks: Peaks }) {
       wave.on("error", (err) => setError(err instanceof Error ? err.message : "Playback failed.")),
     ]
     return () => {
+      seekRef.current = () => undefined
       unsubscribers.forEach((unsubscribe) => unsubscribe())
       wave.destroy()
       player.current = null
     }
-  }, [asset.id, duration, peaks.buckets])
+  }, [asset.id, duration, peaks.buckets, seekRef])
 
   return (
     <div>
@@ -182,13 +250,23 @@ function Transport({ asset, peaks }: { asset: Asset; peaks: Peaks }) {
 export function Analyzer({ assetId }: { assetId: string }) {
   const [asset, setAsset] = useState<Asset | null>(null)
   const [peaks, setPeaks] = useState<Peaks | null>(null)
+  const [charts, setCharts] = useState<ChartSummary[]>([])
+  const [chartId, setChartId] = useState(TECHNICAL[0].id)
+  const [document, setDocument] = useState<ChartDocument | null>(null)
+  const [job, setJob] = useState<Job | null>(null)
   const [loadError, setLoadError] = useState("")
   const [notice, setNotice] = useState("")
+  const seekRef = useRef<(seconds: number) => void>(() => undefined)
+  const onSeek = useCallback((seconds: number) => seekRef.current(seconds), [])
 
   useEffect(() => {
     let cancelled = false
     setAsset(null)
     setPeaks(null)
+    setCharts([])
+    setDocument(null)
+    setJob(null)
+    setChartId(TECHNICAL[0].id)
     setLoadError("")
     setNotice("")
     api
@@ -222,10 +300,63 @@ export function Analyzer({ assetId }: { assetId: string }) {
     }
   }, [assetId])
 
+  useEffect(() => {
+    let cancelled = false
+    api
+      .charts(assetId)
+      .then((list) => {
+        if (!cancelled) {
+          setCharts(list.charts)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [assetId, job?.status])
+
+  useEffect(() => {
+    let cancelled = false
+    api
+      .chart(assetId, chartId)
+      .then((next) => {
+        if (!cancelled) {
+          setDocument(next)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [assetId, chartId, job?.status])
+
+  useEffect(() => {
+    if (!job || job.status === "completed" || job.status === "failed" || job.status === "canceled") {
+      return
+    }
+    const timer = window.setInterval(() => {
+      api
+        .job(job.id)
+        .then((next) => setJob(next))
+        .catch(() => undefined)
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [job])
+
+  useEffect(() => {
+    if (job?.status !== "completed" && job?.status !== "failed") {
+      return
+    }
+    api
+      .asset(assetId)
+      .then(setAsset)
+      .catch(() => undefined)
+  }, [assetId, job?.status])
+
   async function onAnalyze() {
     setNotice("")
     try {
-      await api.analyze(assetId)
+      setJob(await api.analyze(assetId))
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Analysis is not available.")
     }
@@ -240,9 +371,18 @@ export function Analyzer({ assetId }: { assetId: string }) {
         <>
           <p>{`${asset.original_name}. Analysis ${asset.analysis_status}.`}</p>
           {asset.playback_status === "unavailable" ? <p>{playbackCaption(asset)}</p> : null}
-          {peaks ? <Transport asset={asset} peaks={peaks} /> : null}
+          {peaks ? <Transport asset={asset} peaks={peaks} seekRef={seekRef} /> : null}
           {asset.playback_status === "ready" && !peaks && !loadError ? <p>Loading playback.</p> : null}
-          <TechnicalBoard notice={notice} onAnalyze={() => void onAnalyze()} />
+          <TechnicalBoard
+            charts={charts}
+            chartId={chartId}
+            document={document}
+            jobStatus={job?.status ?? ""}
+            notice={notice || job?.error || ""}
+            onAnalyze={() => void onAnalyze()}
+            onSelect={setChartId}
+            onSeek={onSeek}
+          />
         </>
       ) : null}
     </>

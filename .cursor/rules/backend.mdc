@@ -11,7 +11,7 @@ Python 3.12, FastAPI, Pydantic. Specs: `docs/01_TECHNICAL_MVP_SPEC.md`, `docs/03
 - Hash uploads with SHA-256 while streaming. Never read a master into memory just to hash it.
 - Filenames are display strings. Never use them as filesystem paths.
 - Original audio bytes are immutable. A 24-bit playback file is a separate cached derivative.
-- `POST /api/assets/{id}/analyze` returns 501 and creates no job until a real worker exists. The worker must not mark work completed.
+- `POST /api/assets/{id}/analyze` returns 202 and a real job. The request does not run the measurement. A separate worker claims queued jobs and may complete, fail, or mark an abandoned running job interrupted.
 - Migrations enable foreign keys. `assets.sha256` and `(project_id, asset_id)` stay unique.
 - Test with pytest.
 

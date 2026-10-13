@@ -9,18 +9,78 @@ export type Asset = {
   sample_rate: number;
   channels: number;
   subtype: "pcm_16" | "pcm_24";
-  analysis_status: "not_run";
+  analysis_status: "not_run" | "queued" | "running" | "completed" | "failed";
   playback_status: "ready" | "unavailable";
   created_at: string;
+}
+
+export type AxisDefinitions = {
+  x?: string;
+  y?: string;
+  y_scale?: "linear" | "log";
 }
 
 export type Body_upload_asset_api_projects__project_id__assets_post = {
   file: string;
 }
 
-export type ErrorBody = {
-  error: string;
-  message: string;
+export type ChartBar = {
+  label: string;
+  value: number;
+}
+
+export type ChartDocument = {
+  chart_kind: string;
+  status: "not_run" | "ready" | "not_available" | "failed";
+  title: string;
+  evidence_class: string;
+  method_id: string;
+  method_version: string;
+  caveats: Array<string>;
+  summary: Array<SummaryItem>;
+  series: ChartSeries;
+  axis_definitions: AxisDefinitions;
+  review_markers: Array<ReviewMarker>;
+  not_available_reason?: string | null;
+  error?: string | null;
+}
+
+export type ChartHeatmap = {
+  x: Array<number>;
+  y: Array<number>;
+  z: Array<Array<number>>;
+}
+
+export type ChartLine = {
+  name: string;
+  unit: string;
+  x: Array<number>;
+  y: Array<number | null>;
+}
+
+export type ChartList = {
+  charts: Array<ChartSummary>;
+}
+
+export type ChartSeries = {
+  lines?: Array<ChartLine>;
+  bars?: Array<ChartBar>;
+  heatmap?: ChartHeatmap | null;
+}
+
+export type ChartSummary = {
+  chart_kind: string;
+  status: "not_run" | "ready" | "not_available" | "failed";
+  title: string;
+  evidence_class: string;
+  method_id: string;
+  method_version: string;
+  caveats: Array<string>;
+  summary: Array<SummaryItem>;
+  not_available_reason?: string | null;
+  error?: string | null;
+  data_url: string;
+  png_url?: string | null;
 }
 
 export type HTTPValidationError = {
@@ -31,7 +91,7 @@ export type Health = {
   status: string;
   database: string;
   ffmpeg_version: string;
-  analysis: "not_implemented";
+  analysis: "available";
 }
 
 export type Job = {
@@ -75,6 +135,16 @@ export type ProjectDetail = {
   created_at: string;
   updated_at: string;
   assets: Array<Asset>;
+}
+
+export type ReviewMarker = {
+  time_s: number;
+  label: string;
+}
+
+export type SummaryItem = {
+  label: string;
+  value: string;
 }
 
 export type UploadResult = {

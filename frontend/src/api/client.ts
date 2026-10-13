@@ -1,12 +1,19 @@
 import type {
   Asset,
-  ErrorBody,
+  ChartDocument,
+  ChartList,
   Health,
+  Job,
   Peaks,
   Project,
   ProjectDetail,
   UploadResult,
 } from "./types"
+
+type ErrorBody = {
+  error: string
+  message: string
+}
 
 export class ApiError extends Error {
   status: number
@@ -50,6 +57,9 @@ export const api = {
   },
   asset: (id: string) => fetch(`/api/assets/${id}`).then(parse<Asset>),
   peaks: (id: string) => fetch(`/api/assets/${id}/peaks`).then(parse<Peaks>),
-  analyze: (id: string) =>
-    fetch(`/api/assets/${id}/analyze`, { method: "POST" }).then(parse<ErrorBody>),
+  analyze: (id: string) => fetch(`/api/assets/${id}/analyze`, { method: "POST" }).then(parse<Job>),
+  charts: (id: string) => fetch(`/api/assets/${id}/charts`).then(parse<ChartList>),
+  chart: (id: string, kind: string) =>
+    fetch(`/api/assets/${id}/charts/${kind}/data`).then(parse<ChartDocument>),
+  job: (id: string) => fetch(`/api/jobs/${id}`).then(parse<Job>),
 }

@@ -216,6 +216,15 @@ select {
   background: #12171d;
 }
 
+.chart {
+  height: 18rem;
+  width: 100%;
+}
+
+.chart.stacked {
+  height: 28rem;
+}
+
 .transport {
   display: flex;
   flex-wrap: wrap;

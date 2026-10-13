@@ -57,14 +57,14 @@ def test_health(client: TestClient) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["database"] == "ok"
-    assert body["analysis"] == "not_implemented"
+    assert body["analysis"] == "available"
     assert body["ffmpeg_version"] not in ("", "unavailable")
 
 
 def test_foreign_keys_on(client: TestClient) -> None:
     connection = client.app.state.db
     assert connection.execute("PRAGMA foreign_keys").fetchone()[0] == 1
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute(
             "INSERT INTO project_assets (project_id, asset_id, ordering) VALUES ('missing', 'missing', 0)"
@@ -271,23 +271,24 @@ def test_range_request(client: TestClient, tmp_path: Path) -> None:
     assert response.content[:4] == b"RIFF"
 
 
-def test_analyze_is_501_and_creates_no_job(client: TestClient, tmp_path: Path) -> None:
+def test_analyze_enqueues_without_running(client: TestClient, tmp_path: Path) -> None:
     path = tmp_path / "idle.wav"
     pcm_wav(path, [0] * 800, 8000, 1, 16)
     project_id = _project(client)
     asset = _upload(client, project_id, path).json()["asset"]
     response = client.post(f"/api/assets/{asset['id']}/analyze")
-    assert response.status_code == 501
+    assert response.status_code == 202, response.text
     body = response.json()
-    assert body["error"] == "not_implemented"
-    assert "no job" in body["message"].lower()
-    assert _jobs(client) == 0
-    assert client.app.state.worker.run_available() == 0
-    assert _jobs(client) == 0
+    assert body["status"] == "queued"
+    assert body["asset_id"] == asset["id"]
+    assert _jobs(client) == 1
     again = client.get(f"/api/assets/{asset['id']}")
-    assert again.json()["analysis_status"] == "not_run"
+    assert again.json()["analysis_status"] == "queued"
     missing = client.get("/api/jobs/does-not-exist")
     assert missing.status_code == 404
+    charts = client.get(f"/api/assets/{asset['id']}/charts")
+    assert charts.status_code == 200
+    assert {item["status"] for item in charts.json()["charts"]} == {"not_run"}
 
 
 def test_peaks_preserve_min_max(client: TestClient, tmp_path: Path) -> None:
