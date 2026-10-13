@@ -1,0 +1,46 @@
+# Secrets. Keep the example.
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+
+# uv cache if it lands inside the repo
+.uv/
+.uv-cache/
+
+# Node / Vite
+node_modules/
+dist/
+dist-ssr/
+.vite/
+coverage/
+*.local
+.pnpm-store/
+
+# Local SQLite
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Runtime data: imported audio, playback derivatives, peaks, upload temps.
+# Source, docs, tests, and lockfiles stay tracked.
+data/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

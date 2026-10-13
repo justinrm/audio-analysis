@@ -1,0 +1,32 @@
+Input #0, wav, from '/workspace/scratch/7f15a886af8d/upload/Nothing Holy Happens.wav':
+  Metadata:
+    comment         : Mastered with MIXEA
+    encoder         : Lavf61.1.100
+  Duration: 00:02:51.56, bitrate: 2304 kb/s
+  Stream #0:0: Audio: pcm_s24le ([1][0][0][0] / 0x0001), 48000 Hz, stereo, s32 (24 bit), 2304 kb/s
+Stream mapping:
+  Stream #0:0 -> #0:0 (pcm_s24le (native) -> pcm_s16le (native))
+Press [q] to stop, [?] for help
+Output #0, null, to 'pipe:':
+  Metadata:
+    comment         : Mastered with MIXEA
+    encoder         : Lavf60.16.100
+  Stream #0:0: Audio: pcm_s16le, 48000 Hz, stereo, s16, 1536 kb/s
+    Metadata:
+      encoder         : Lavc60.31.102 pcm_s16le
+[out#0/null @ 0x556995a3d5c0] video:0kB audio:32168kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: unknown
+size=N/A time=00:02:51.50 bitrate=N/A speed= 132x    
+[Parsed_ebur128_0 @ 0x556995a80140] Summary:
+
+  Integrated loudness:
+    I:         -11.6 LUFS
+    Threshold: -21.7 LUFS
+
+  Loudness range:
+    LRA:         4.1 LU
+    Threshold: -31.6 LUFS
+    LRA low:   -14.0 LUFS
+    LRA high:  -10.0 LUFS
+
+  True peak:
+    Peak:        1.2 dBFS

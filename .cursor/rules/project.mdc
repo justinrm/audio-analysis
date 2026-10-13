@@ -1,0 +1,40 @@
+---
+description: Audio Reference Studio architecture, local-first boundaries, and milestone gates
+alwaysApply: true
+---
+
+# Audio Reference Studio
+
+Specs live in `docs/01_TECHNICAL_MVP_SPEC.md`, `docs/03_CURSOR_AGENT_FIRST_SESSION.md`, and `docs/04_TECHNICAL_CHART_REQUIREMENTS.md`. Follow them; do not copy them into code comments.
+
+## Architecture
+
+React/TypeScript frontend, Python 3.12/FastAPI backend, SQLite plus local files. Analysis that exists later is deterministic. Optional AI interpretation stays off by default.
+
+## Local-first
+
+Bind `127.0.0.1`. No cloud, auth, telemetry, payments, or paid API calls.
+
+## Gates
+
+Stop at the current milestone. Do not start the next one without human approval.
+
+## Evidence
+
+Use `measured`, `estimated`, `textual`, `interpretive`, or `unknown`. Never invent sung timestamps or audible-defect verdicts.
+
+## Delegation
+
+Agree the shared contract first. Frontend owns `frontend/**`. Backend owns `backend/**`. Neither edits the other's tree or `references/legacy-audit/`.
+
+## Keep approved decisions
+
+24-bit masters stay byte-identical; playback is a separate cached 16-bit derivative. Analyze stays unimplemented until a real worker exists, and it must not fake a completed job.
+
+```python
+# ❌ BAD — claims work that did not run
+analysis_status = "completed"
+
+# ✅ GOOD
+analysis_status = "not_run"
+```

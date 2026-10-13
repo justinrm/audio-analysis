@@ -1,0 +1,3 @@
+# Large legacy binaries still tracked in git. ffmpeg logs are ~1 KB and stay indexed.
+references/legacy-audit/output/Four_Song_Album_Audit.pdf
+references/legacy-audit/analysis/*.npz

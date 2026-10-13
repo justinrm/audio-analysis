@@ -1,0 +1,32 @@
+Input #0, wav, from '/workspace/scratch/7f15a886af8d/upload/She Calls Me Back.wav':
+  Metadata:
+    comment         : Mastered with MIXEA
+    encoder         : Lavf61.1.100
+  Duration: 00:03:07.20, bitrate: 2304 kb/s
+  Stream #0:0: Audio: pcm_s24le ([1][0][0][0] / 0x0001), 48000 Hz, stereo, s32 (24 bit), 2304 kb/s
+Stream mapping:
+  Stream #0:0 -> #0:0 (pcm_s24le (native) -> pcm_s16le (native))
+Press [q] to stop, [?] for help
+Output #0, null, to 'pipe:':
+  Metadata:
+    comment         : Mastered with MIXEA
+    encoder         : Lavf60.16.100
+  Stream #0:0: Audio: pcm_s16le, 48000 Hz, stereo, s16, 1536 kb/s
+    Metadata:
+      encoder         : Lavc60.31.102 pcm_s16le
+[out#0/null @ 0x55efa4ee05c0] video:0kB audio:35100kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: unknown
+size=N/A time=00:03:07.10 bitrate=N/A speed= 139x    
+[Parsed_ebur128_0 @ 0x55efa4f23140] Summary:
+
+  Integrated loudness:
+    I:         -11.6 LUFS
+    Threshold: -21.8 LUFS
+
+  Loudness range:
+    LRA:         5.2 LU
+    Threshold: -31.8 LUFS
+    LRA low:   -15.0 LUFS
+    LRA high:   -9.8 LUFS
+
+  True peak:
+    Peak:        0.7 dBFS
