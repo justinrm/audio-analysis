@@ -26,6 +26,7 @@ export function TechnicalBoard({
   onAnalyze,
   onSelect,
   onSeek,
+  playhead = null,
 }: {
   charts: ChartSummary[]
   chartId: string
@@ -35,6 +36,7 @@ export function TechnicalBoard({
   onAnalyze: () => void
   onSelect: (chartId: string) => void
   onSeek: (seconds: number) => void
+  playhead?: number | null
 }) {
   const [tab, setTab] = useState<"technical" | "lyrics">("technical")
   const rows = TECHNICAL.map((item) => {
@@ -90,7 +92,7 @@ export function TechnicalBoard({
               </h2>
               <p>Status: {STATUS_LABEL[active?.status ?? selected.status] ?? selected.status}</p>
               {jobStatus ? <p>Analysis {STATUS_LABEL[jobStatus] ?? jobStatus}.</p> : null}
-              {active?.status === "ready" ? <ChartView chart={active} onSeek={onSeek} /> : null}
+              {active?.status === "ready" ? <ChartView chart={active} onSeek={onSeek} playhead={playhead} /> : null}
               {active && active.status !== "ready" && active.status !== "not_run" ? (
                 <p>{active.not_available_reason || active.error}</p>
               ) : null}
@@ -144,10 +146,12 @@ function Transport({
   asset,
   peaks,
   seekRef,
+  onTime,
 }: {
   asset: Asset
   peaks: Peaks
   seekRef: { current: (seconds: number) => void }
+  onTime: (seconds: number) => void
 }) {
   const host = useRef<HTMLDivElement>(null)
   const player = useRef<WaveSurfer | null>(null)
@@ -185,7 +189,10 @@ function Transport({
       wave.setTime(Math.min(Math.max(seconds, 0), duration))
     }
     const unsubscribers = [
-      wave.on("timeupdate", (value) => setTime(value)),
+      wave.on("timeupdate", (value) => {
+        setTime(value)
+        onTime(value)
+      }),
       wave.on("play", () => setPlaying(true)),
       wave.on("pause", () => setPlaying(false)),
       wave.on("finish", () => setPlaying(false)),
@@ -197,7 +204,7 @@ function Transport({
       wave.destroy()
       player.current = null
     }
-  }, [asset.id, duration, peaks.buckets, seekRef])
+  }, [asset.id, duration, peaks.buckets, seekRef, onTime])
 
   return (
     <div>
@@ -258,6 +265,8 @@ export function Analyzer({ assetId }: { assetId: string }) {
   const [notice, setNotice] = useState("")
   const seekRef = useRef<(seconds: number) => void>(() => undefined)
   const onSeek = useCallback((seconds: number) => seekRef.current(seconds), [])
+  const [playhead, setPlayhead] = useState<number | null>(null)
+  const onTime = useCallback((seconds: number) => setPlayhead(seconds), [])
 
   useEffect(() => {
     let cancelled = false
@@ -269,6 +278,7 @@ export function Analyzer({ assetId }: { assetId: string }) {
     setChartId(TECHNICAL[0].id)
     setLoadError("")
     setNotice("")
+    setPlayhead(null)
     api
       .asset(assetId)
       .then(async (next) => {
@@ -371,7 +381,7 @@ export function Analyzer({ assetId }: { assetId: string }) {
         <>
           <p>{`${asset.original_name}. Analysis ${asset.analysis_status}.`}</p>
           {asset.playback_status === "unavailable" ? <p>{playbackCaption(asset)}</p> : null}
-          {peaks ? <Transport asset={asset} peaks={peaks} seekRef={seekRef} /> : null}
+          {peaks ? <Transport asset={asset} peaks={peaks} seekRef={seekRef} onTime={onTime} /> : null}
           {asset.playback_status === "ready" && !peaks && !loadError ? <p>Loading playback.</p> : null}
           <TechnicalBoard
             charts={charts}
@@ -382,6 +392,7 @@ export function Analyzer({ assetId }: { assetId: string }) {
             onAnalyze={() => void onAnalyze()}
             onSelect={setChartId}
             onSeek={onSeek}
+            playhead={playhead}
           />
         </>
       ) : null}

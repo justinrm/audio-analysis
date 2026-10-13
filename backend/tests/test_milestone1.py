@@ -4,11 +4,13 @@ import math
 from pathlib import Path
 
 import pytest
-from app.charts import build_t05
+from app.charts import build_t01, build_t02, build_t04, build_t05, build_t06
 from app.config import Settings
 from app.main import create_app
 from app.measure import (
     ALGORITHM_VERSION,
+    FLOOR,
+    PARAMS,
     ChartUnavailable,
     correlation,
     decode_wav,
@@ -307,11 +309,100 @@ def test_envelope_keeps_one_full_scale_sample(tmp_path: Path) -> None:
     assert abs(measured["sample_peak_time_s"] - 1000 / 8000) < 0.001
 
 
-def test_region_deltas_compare_equal_windows() -> None:
-    rows = region_deltas([0.5, 1.5, 2.5, 3.5], [0.0, 0.0, 10.0, 10.0], 4.0, 2)
-    assert rows[0]["delta"] == pytest.approx(-5)
-    assert rows[1]["delta"] == pytest.approx(5)
+def test_region_deltas_use_mean_square_power() -> None:
+    # Powers are linear mean-square, not decibels. 0 dB -> 1, 10 dB -> 10.
+    # P_file = 5.5. Arithmetic mean of the decibel values would be ±5 dB.
+    rows = region_deltas([0.5, 1.5, 2.5, 3.5], [1.0, 1.0, 10.0, 10.0], 4.0, 2)
+    assert rows[0]["delta"] == pytest.approx(10 * math.log10(1 / 5.5))
+    assert rows[1]["delta"] == pytest.approx(10 * math.log10(10 / 5.5))
     assert rows[0]["end_s"] == pytest.approx(2)
+    assert rows[0]["delta"] == pytest.approx(-7.403627, abs=1e-5)
+    assert rows[1]["delta"] == pytest.approx(2.596373, abs=1e-5)
+
+
+def test_region_with_a_loud_frame_and_a_silent_frame() -> None:
+    # Window 0 holds power 1 and power 0. Window 1 holds power 1 twice.
+    # P0 = 0.5, P1 = 1, P_file = 0.75.
+    rows = region_deltas([0.5, 1.5, 2.5, 3.5], [1.0, 0.0, 1.0, 1.0], 4.0, 2)
+    assert rows[0]["delta"] < 0 < rows[1]["delta"]
+    assert rows[0]["delta"] == pytest.approx(10 * math.log10(2 / 3))
+    assert rows[1]["delta"] == pytest.approx(10 * math.log10(4 / 3))
+    assert rows[0]["delta"] == pytest.approx(-1.760913, abs=1e-5)
+    assert rows[1]["delta"] == pytest.approx(1.249387, abs=1e-5)
+    assert all(math.isfinite(row["delta"]) for row in rows)
+
+
+def test_region_deltas_weight_unequal_frames_and_silence() -> None:
+    rows = region_deltas([0.5, 3.0], [1.0, 0.0], 4.0, 2, [1.0, 3.0])
+    assert rows[0]["delta"] == pytest.approx(10 * math.log10(4))
+    assert rows[0]["delta"] == pytest.approx(6.020600, abs=1e-5)
+    assert rows[1]["delta"] == pytest.approx(10 * math.log10(FLOOR / 0.25))
+    assert rows[1]["delta"] == pytest.approx(-153.979400, abs=1e-4)
+    silent = region_deltas([0.5, 1.5], [0.0, 0.0], 2.0, 2)
+    assert [row["delta"] for row in silent] == [0.0, 0.0]
+    encoded = json.dumps([row["delta"] for row in rows + silent])
+    assert "NaN" not in encoded and "Infinity" not in encoded
+
+
+def test_t01_axis_is_normalized_amplitude(tmp_path: Path) -> None:
+    path = tmp_path / "wave.wav"
+    _tone(path, 1.0, 440, 0.5, 1, 16)
+    audio = decode_wav(path)
+    document = build_t01(audio, {"levels": levels(audio)})
+    assert document["axis_definitions"] == {
+        "x": "Time (s)",
+        "y": "Normalized amplitude",
+        "y_scale": "linear",
+    }
+    units = {line["unit"] for line in document["series"]["lines"]}
+    assert {"amplitude", "dBFS"} <= units
+    assert document["review_markers"][0]["kind"] == "sample_peak"
+    assert "master" in document["method_id"]
+    text = " ".join(document["caveats"])
+    assert "Zoom uses the detail buckets" not in text
+    if document["summary"][-1]["value"] != document["summary"][-2]["value"]:
+        assert "full range draws the overview" in text
+        assert "zoomed interval draws the detail" in text
+
+
+def test_short_waveform_does_not_claim_a_resolution_switch(tmp_path: Path) -> None:
+    path = tmp_path / "tiny.wav"
+    pcm_wav(path, [1000] * 100, 8000, 1, 16)
+    audio = decode_wav(path)
+    document = build_t01(audio, {"levels": levels(audio)})
+    assert "does not switch resolution" in " ".join(document["caveats"])
+
+
+def test_t02_regions_are_relative_rms_power(tmp_path: Path) -> None:
+    # 1 s frames: loud, silent, loud. The second window contains both.
+    path = tmp_path / "split.wav"
+    rate = 8000
+    full = 32767
+    loud = [int(0.5 * full * math.sin(2 * math.pi * 440 * index / rate)) for index in range(rate)]
+    pcm_wav(path, loud + [0] * rate + loud, rate, 1, 16)
+    audio = decode_wav(path)
+    document = build_t02(
+        audio,
+        {
+            "levels": levels(audio),
+            "loudness": {
+                "integrated_lufs": -14.0,
+                "lra_lu": 2.0,
+                "true_peak_dbtp": -6.0,
+                "short_term": [],
+            },
+        },
+    )
+    assert document["axis_definitions"]["y"] == "Relative RMS-power level (dB)"
+    assert document["axis_definitions"]["y_scale"] == "linear"
+    assert any("not LUFS" in caveat for caveat in document["caveats"])
+    bars = document["series"]["bars"]
+    assert bars[0]["value"] == pytest.approx(10 * math.log10(1.5), abs=1e-6)
+    assert bars[1]["value"] == pytest.approx(10 * math.log10(0.75), abs=1e-6)
+    assert bars[0]["value"] == pytest.approx(1.760913, abs=1e-5)
+    assert bars[1]["value"] == pytest.approx(-1.249387, abs=1e-5)
+    assert "LUFS" in document["summary"][0]["value"]
+    assert document["method_id"] == "ffmpeg-ebur128+frame-rms-v1"
 
 
 def test_sine_loudness_tracks_peak_minus_three_db(tmp_path: Path) -> None:
@@ -341,6 +432,54 @@ def test_spectrogram_stays_linear_and_under_nyquist(tmp_path: Path) -> None:
     assert abs(freqs[peak] - 440) < 80
 
 
+def test_spectrogram_keeps_a_440_hz_tone_at_44100(tmp_path: Path) -> None:
+    path = tmp_path / "a440.wav"
+    rate = 44100
+    full = 32767
+    count = rate
+    samples = [
+        int(0.5 * full * math.sin(2 * math.pi * 440 * index / rate)) for index in range(count)
+    ]
+    pcm_wav(path, samples, rate, 1, 16)
+    audio = decode_wav(path)
+    data = spectrogram(audio)
+    assert "strongest_hz" in data
+    assert "freq_lo" in data
+    assert "freq_hi" in data
+    step = audio.sample_rate / data["nperseg"]
+    assert data["nperseg"] == 2048
+    assert step == pytest.approx(21.533203125)
+    peak = max(range(len(data["db"])), key=lambda index: max(data["db"][index]))
+    strongest = float(data["strongest_hz"][peak])
+    low = float(data["freq_lo"][peak])
+    high = float(data["freq_hi"][peak])
+    assert low <= strongest <= high
+    assert low - step <= 440 <= high + step
+    assert abs(strongest - 440) <= step
+    assert abs(strongest / step - round(strongest / step)) < 1e-6
+    assert float(max(data["freq_hi"])) <= audio.sample_rate / 2
+    assert float(max(data["freqs"])) <= audio.sample_rate / 2
+    assert [item["name"] for item in data["coarse"]] == ["bass", "body", "presence", "air"]
+    body = [float(value) for value in data["coarse"][1]["db"]]
+    air = [float(value) for value in data["coarse"][3]["db"]]
+    assert max(body) > max(air)
+    document = build_t04(audio, {})
+    assert "peak" in document["method_id"]
+    assert document["axis_definitions"]["y_scale"] == "linear"
+    assert "log-frequency" not in " ".join(document["caveats"])
+    ranges = document["frequency_ranges"]
+    assert ranges[peak]["lo_hz"] == pytest.approx(low)
+    assert ranges[peak]["hi_hz"] == pytest.approx(high)
+    assert ranges[peak]["strongest_hz"] == pytest.approx(strongest)
+    assert max(item["hi_hz"] for item in ranges) <= audio.sample_rate / 2
+
+
+def test_corrected_measurements_are_not_served_as_m1_v2() -> None:
+    assert ALGORITHM_VERSION == "m1-v3"
+    assert PARAMS["region_delta"] == "power"
+    assert PARAMS["spectrogram_reduce"] == "peak"
+
+
 def test_click_train_pulse_is_deterministic(tmp_path: Path) -> None:
     path = tmp_path / "clicks.wav"
     rate = 8000
@@ -358,6 +497,29 @@ def test_click_train_pulse_is_deterministic(tmp_path: Path) -> None:
     for item in first["hypotheses"]:
         assert item["provenance"] == "autocorrelation-peak"
         assert item["relation"] in {"half-time", "double-time"}
+
+
+def test_pulse_display_keeps_each_peak_once(tmp_path: Path) -> None:
+    path = tmp_path / "clicks.wav"
+    rate = 8000
+    samples = [0] * (rate * 8)
+    step = rate // 2
+    for index in range(0, len(samples), step):
+        samples[index] = 20000
+    pcm_wav(path, samples, rate, 1, 16)
+    audio = decode_wav(path)
+    data = rhythm(audio)
+    assert data["hypotheses"]
+    document = build_t06(audio, {})
+    labels = [bar["label"] for bar in document["series"]["bars"]]
+    shown = [round(float(label.split()[0]), 1) for label in labels]
+    assert len(shown) == len(set(shown))
+    assert len(labels) == len(data["candidates"])
+    for item in data["hypotheses"]:
+        assert item["relation"] in " ".join(labels)
+        assert any(abs(float(label.split()[0]) - item["bpm"]) < 0.15 for label in labels)
+    assert all(str(item["value"]).startswith("autocorrelation") for item in document["summary"])
+    assert "not onset strength" in " ".join(document["caveats"])
 
 
 def test_constant_signal_invents_no_tempo(tmp_path: Path) -> None:
@@ -383,12 +545,8 @@ def test_pure_tone_pitch_class_is_stable(tmp_path: Path) -> None:
 def test_structure_contrast_is_deterministic(tmp_path: Path) -> None:
     path = tmp_path / "join.wav"
     rate = 8000
-    half = [
-        int(8000 * math.sin(2 * math.pi * 200 * i / rate)) for i in range(rate * 10)
-    ]
-    other = [
-        int(8000 * math.sin(2 * math.pi * 2000 * i / rate)) for i in range(rate * 10)
-    ]
+    half = [int(8000 * math.sin(2 * math.pi * 200 * i / rate)) for i in range(rate * 10)]
+    other = [int(8000 * math.sin(2 * math.pi * 2000 * i / rate)) for i in range(rate * 10)]
     pcm_wav(path, half + other, rate, 1, 16)
     audio = decode_wav(path)
     data = structure(audio)

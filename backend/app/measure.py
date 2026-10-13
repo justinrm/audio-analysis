@@ -1,4 +1,4 @@
-"""Pure measurements for one WAV. Constants are versioned as m1-v2.
+"""Pure measurements for one WAV. Constants are versioned as m1-v3.
 
 Legacy audit math is the source of the window sizes. Decoding scales each
 integer PCM width by its own full scale. The old unconditional /2**31 scale
@@ -20,13 +20,15 @@ from pathlib import Path
 import numpy as np
 from scipy import ndimage, signal
 
-ALGORITHM_VERSION = "m1-v2"
+ALGORITHM_VERSION = "m1-v3"
 PARAMS = {
     "welch_nperseg": 8192,
     "envelope_s": 0.1,
     "envelope_buckets": 4000,
     "overview_buckets": 250,
     "region_count": 4,
+    "region_delta": "power",
+    "spectrogram_reduce": "peak",
     "rms_s": 1.0,
     "downsample": 4,
     "rhythm_nperseg": 1024,
@@ -139,14 +141,25 @@ def _peak_location(samples: np.ndarray, rate: int) -> tuple[float, float, int]:
     return finite(flat[frame, channel]), float(frame) / rate, int(channel) + 1
 
 
-def frame_power_db(samples: np.ndarray, rate: int, frame_s: float) -> tuple[np.ndarray, np.ndarray]:
+def _frame_power(
+    samples: np.ndarray, rate: int, frame_s: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     frame = max(1, round(rate * frame_s))
     count = samples.shape[0] // frame
+    empty = np.array([])
     if count < 1:
-        return np.array([]), np.array([])
+        return empty, empty, empty
     cut = samples[: count * frame]
     power = np.mean(cut.reshape(count, frame, samples.shape[1]) ** 2, axis=(1, 2))
     times = (np.arange(count) + 0.5) * frame / rate
+    weights = np.full(count, frame / rate)
+    return times, power, weights
+
+
+def frame_power_db(samples: np.ndarray, rate: int, frame_s: float) -> tuple[np.ndarray, np.ndarray]:
+    times, power, _weights = _frame_power(samples, rate, frame_s)
+    if times.size == 0:
+        return times, power
     return times, 10.0 * np.log10(np.maximum(power, FLOOR))
 
 
@@ -154,8 +167,8 @@ def levels(audio: Decoded) -> dict:
     samples = audio.samples
     peak, peak_time, channel = _peak_location(samples, audio.sample_rate)
     power = float(np.mean(samples**2))
-    rms_t, rms_db = frame_power_db(samples, audio.sample_rate, PARAMS["rms_s"])
-    env_t, env_db = frame_power_db(samples, audio.sample_rate, PARAMS["envelope_s"])
+    rms_t, rms_p, rms_w = _frame_power(samples, audio.sample_rate, PARAMS["rms_s"])
+    env_t, env_p, env_w = _frame_power(samples, audio.sample_rate, PARAMS["envelope_s"])
     return {
         "rms_dbfs": power_db(power),
         "sample_peak_dbfs": amp_db(peak),
@@ -163,9 +176,13 @@ def levels(audio: Decoded) -> dict:
         "sample_peak_channel": channel,
         "crest_db": finite(amp_db(peak) - power_db(power)),
         "rms_1s_t": rms_t,
-        "rms_1s_db": rms_db,
+        "rms_1s_db": _power_to_db(rms_p),
+        "rms_1s_power": rms_p,
+        "rms_1s_weight": rms_w,
         "rms_100ms_t": env_t,
-        "rms_100ms_db": env_db,
+        "rms_100ms_db": _power_to_db(env_p),
+        "rms_100ms_power": env_p,
+        "rms_100ms_weight": env_w,
         "envelope": minmax_envelope(samples, audio.sample_rate, PARAMS["envelope_buckets"]),
         "overview": minmax_envelope(samples, audio.sample_rate, PARAMS["overview_buckets"]),
     }
@@ -195,14 +212,22 @@ def minmax_envelope(samples: np.ndarray, rate: int, limit: int) -> dict:
     }
 
 
-def region_deltas(times, values, duration: float, parts: int) -> list[dict]:
-    """Mean level in equal-duration windows, minus the mean of the same series."""
+def region_deltas(times, powers, duration: float, parts: int, weights=None) -> list[dict]:
+    """Duration-weighted mean-square versus the same series.
+
+    delta_db = 10 * log10(P_region / P_file). This is relative RMS power, not LUFS.
+    A zero reference stays at 0 dB. A silent region uses the power floor so the
+    ratio stays finite.
+    """
     axis = np.asarray(times, dtype=float)
-    series = np.asarray(values, dtype=float)
-    usable = np.isfinite(series)
+    series = np.asarray(powers, dtype=float)
+    mass = (
+        np.ones(series.shape, dtype=float) if weights is None else np.asarray(weights, dtype=float)
+    )
+    usable = np.isfinite(series) & (series >= 0) & np.isfinite(mass) & (mass > 0)
     if parts < 1 or duration <= 0 or not np.any(usable):
         return []
-    baseline = float(np.mean(series[usable]))
+    baseline = _weighted_power(series, mass, usable)
     rows = []
     for index in range(parts):
         start = duration * index / parts
@@ -210,16 +235,35 @@ def region_deltas(times, values, duration: float, parts: int) -> list[dict]:
         inside = usable & (axis >= start) & (axis < end if index + 1 < parts else axis <= end)
         if not np.any(inside):
             continue
-        level = float(np.mean(series[inside]))
+        level = _weighted_power(series, mass, inside)
         rows.append(
             {
                 "start_s": finite(start),
                 "end_s": finite(end),
-                "level": finite(level),
-                "delta": finite(level - baseline),
+                "level": finite(power_db(level)),
+                "delta": finite(_power_delta(level, baseline)),
             }
         )
     return rows
+
+
+def _power_to_db(power: np.ndarray) -> np.ndarray:
+    if power.size == 0:
+        return power
+    return 10.0 * np.log10(np.maximum(power, FLOOR))
+
+
+def _weighted_power(series: np.ndarray, mass: np.ndarray, mask: np.ndarray) -> float:
+    total = float(mass[mask].sum())
+    if total <= 0:
+        return 0.0
+    return float((series[mask] * mass[mask]).sum() / total)
+
+
+def _power_delta(region: float, reference: float) -> float:
+    if reference <= FLOOR:
+        return 0.0
+    return power_db(region) - power_db(reference)
 
 
 def _nperseg(length: int, requested: int) -> int:
@@ -304,10 +348,19 @@ def spectrogram(audio: Decoded) -> dict:
         if selected.size == 0:
             continue
         coarse.append({"name": name, "db": selected.mean(axis=0)})
+    if PARAMS["spectrogram_reduce"] != "peak":
+        raise ValueError("spectrogram display aggregation must be peak")
+    heat = _peak_heatmap(db, freqs, times, 96, 180)
+    nyquist = audio.sample_rate / 2
+    if float(np.max(heat["freq_hi"])) > nyquist + 1e-6:
+        raise ValueError("spectrogram row exceeds Nyquist")
     return {
-        "freqs": _decimate_1d(freqs, 96),
-        "times": _decimate_1d(times, 180),
-        "db": _decimate_2d(db, 96, 180),
+        "freqs": heat["strongest_hz"],
+        "freq_lo": heat["freq_lo"],
+        "freq_hi": heat["freq_hi"],
+        "strongest_hz": heat["strongest_hz"],
+        "times": heat["times"],
+        "db": heat["db"],
         "coarse_t": _decimate_1d(times, 180),
         "coarse": [{"name": item["name"], "db": _decimate_1d(item["db"], 180)} for item in coarse],
         "nperseg": nperseg,
@@ -726,6 +779,44 @@ def _interval(times: np.ndarray, start: int, end: int) -> dict:
     return {
         "start_s": finite(float(times[start]) - hop / 2),
         "end_s": finite(float(times[end - 1]) + hop / 2),
+    }
+
+
+def _index_edges(count: int, limit: int) -> list[tuple[int, int]]:
+    if count <= limit:
+        return [(index, index + 1) for index in range(count)]
+    edges = np.linspace(0, count, limit + 1).astype(int)
+    return [(int(start), int(stop)) for start, stop in itertools.pairwise(edges) if stop > start]
+
+
+def _peak_heatmap(
+    db: np.ndarray, freqs: np.ndarray, times: np.ndarray, rows: int, cols: int
+) -> dict:
+    """Max dB in each display cell so a narrow tone is not averaged away.
+
+    Each row keeps the FFT bins it aggregated. strongest_hz is the bin that
+    reached the highest dB in that row, not the midpoint of the row.
+    """
+    freq_edges = _index_edges(db.shape[0], rows)
+    time_edges = _index_edges(db.shape[1], cols)
+    grid = []
+    low = []
+    high = []
+    strongest = []
+    for start, stop in freq_edges:
+        block = db[start:stop]
+        local = int(np.argmax(block.max(axis=1)))
+        low.append(finite(float(freqs[start])))
+        high.append(finite(float(freqs[stop - 1])))
+        strongest.append(finite(float(freqs[start + local])))
+        grid.append([finite(float(block[:, left:right].max())) for left, right in time_edges])
+    centers = [finite(float(np.mean(times[left:right]))) for left, right in time_edges]
+    return {
+        "freq_lo": np.array(low),
+        "freq_hi": np.array(high),
+        "strongest_hz": np.array(strongest),
+        "times": np.array(centers),
+        "db": np.array(grid),
     }
 
 

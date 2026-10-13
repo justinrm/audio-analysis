@@ -8,6 +8,7 @@ import numpy as np
 
 from app.measure import (
     ALGORITHM_VERSION,
+    PARAMS,
     ChartUnavailable,
     Decoded,
     ending,
@@ -149,20 +150,20 @@ def build_t01(audio: Decoded, shared: dict) -> dict:
         "frame-rms+master-minmax-envelope-v1",
         [
             "Envelope traces are min and max of the master inside equal buckets.",
-            (
-                f"The detail envelope uses {envelope['buckets']} buckets "
-                f"({envelope['bucket_s'] * 1000:.1f} ms). "
-                f"The overview uses {overview['buckets']} wider buckets "
-                f"({overview['bucket_s'] * 1000:.1f} ms). Zoom uses the detail buckets."
-            ),
+            _waveform_resolution(envelope, overview),
             "A bucket max is not the exact sample. The sample-peak marker is the exact sample.",
             "100 ms and 1 s RMS are frame powers, not the waveform.",
+            "Waveform amplitude and RMS use separate linear axes. A quiet RMS trace does not rescale the waveform.",
             "The transport preview is a separate playback envelope, not this chart.",
         ],
     )
     document["sample_rate"] = audio.sample_rate
     document["hop_s"] = envelope["bucket_s"]
-    document["axis_definitions"] = {"x": "Time (s)", "y": "Amplitude or dBFS", "y_scale": "linear"}
+    document["axis_definitions"] = {
+        "x": "Time (s)",
+        "y": "Normalized amplitude",
+        "y_scale": "linear",
+    }
     document["series"]["lines"].extend(
         [
             _line("Envelope max", envelope["t"], envelope["max"], "amplitude"),
@@ -199,6 +200,25 @@ def build_t01(audio: Decoded, shared: dict) -> dict:
     document["time_start_s"] = 0.0
     document["time_end_s"] = audio.samples.shape[0] / audio.sample_rate
     return document
+
+
+def _waveform_resolution(envelope: dict, overview: dict) -> str:
+    detail_n = int(envelope["buckets"])
+    overview_n = int(overview["buckets"])
+    if overview_n < detail_n:
+        return (
+            f"The detail envelope uses {detail_n} buckets "
+            f"({envelope['bucket_s'] * 1000:.1f} ms). "
+            f"The overview uses {overview_n} wider buckets "
+            f"({overview['bucket_s'] * 1000:.1f} ms). "
+            "The interactive full range draws the overview. A zoomed interval draws the detail buckets. "
+            "Zoom does not compute another waveform."
+        )
+    return (
+        f"This recording uses {detail_n} waveform buckets "
+        f"({envelope['bucket_s'] * 1000:.1f} ms). "
+        "The overview is not coarser, so zoom does not switch resolution."
+    )
 
 
 def build_t02(audio: Decoded, shared: dict) -> dict:
@@ -254,16 +274,18 @@ def build_t02(audio: Decoded, shared: dict) -> dict:
             }
             for item in regions
         ]
+        document["axis_definitions"]["y"] = "Relative RMS-power level (dB)"
         document["summary"].extend(
             _summary(
                 f"Window {item['start_s']:.1f}–{item['end_s']:.1f} s",
-                f"{item['delta']:+.2f} dB vs file mean",
+                f"{item['delta']:+.2f} dB vs file RMS power",
             )
             for item in regions
         )
         document["caveats"].append(
-            "Windows are equal slices of the file. The bar is mean 1 s RMS, or 100 ms RMS "
-            "when the file has fewer than two 1 s frames, minus the mean of that same series. "
+            "Windows are equal slices of the file. Each bar is 10*log10 of that window's "
+            "duration-weighted mean-square power divided by the same mean for the series. "
+            "It is relative RMS-power level, not LUFS. "
             "These are analysis windows, not verses, choruses, or emotional sections."
         )
     else:
@@ -277,13 +299,15 @@ def _regions(level: dict, duration: float) -> list[dict]:
     if parts == 0:
         return []
     times = level["rms_1s_t"]
-    values = level["rms_1s_db"]
+    powers = level["rms_1s_power"]
+    weights = level["rms_1s_weight"]
     if len(times) < 2:
         times = level["rms_100ms_t"]
-        values = level["rms_100ms_db"]
+        powers = level["rms_100ms_power"]
+        weights = level["rms_100ms_weight"]
     if len(times) < 2:
         return []
-    return region_deltas(times, values, duration, parts)
+    return region_deltas(times, powers, duration, parts, weights)
 
 
 def build_t03(audio: Decoded, shared: dict) -> dict:
@@ -346,12 +370,12 @@ def build_t04(audio: Decoded, shared: dict) -> dict:
         "T04",
         "ready",
         "measured",
-        f"stft-magnitude-nperseg-{data['nperseg']}-v1",
+        f"stft-{PARAMS['spectrogram_reduce']}-nperseg-{data['nperseg']}-v1",
         [
-            "Color is magnitude in dB relative to the track median, then averaged into display bins.",
-            "The frequency axis is linearly spaced FFT bins, averaged into at most 96 rows. It is not a log-frequency scale.",
-            "Band traces are bass 20–250 Hz, body 250–2000 Hz, presence 2000–5000 Hz, and air 5000 Hz to Nyquist. They are not vocal or instrument tracks.",
-            "Averaging neighboring bins can lower a narrow peak. It does not move energy above Nyquist.",
+            "Color is magnitude in dB relative to the track median. Each display cell is the peak in that time and frequency block, not the mean of decibel bins.",
+            "The frequency axis is linear FFT bins. Each row covers its own bin range and is labeled with the strongest bin in that row. Frequencies are not converted to log frequency.",
+            "Band traces are bass 20–250 Hz, body 250–2000 Hz, presence 2000–5000 Hz, and air 5000 Hz to Nyquist. They are mean band levels, not vocal or instrument tracks.",
+            "Peak aggregation does not move energy above Nyquist.",
         ],
     )
     document["axis_definitions"] = {"x": "Time (s)", "y": "Frequency (Hz)", "y_scale": "linear"}
@@ -371,6 +395,12 @@ def build_t04(audio: Decoded, shared: dict) -> dict:
             _line(item["name"], data["coarse_t"], item["db"], "dB rel. median")
         )
     document["summary"].extend(_summary(item["name"], "time trace") for item in data["coarse"])
+    document["frequency_ranges"] = [
+        {"lo_hz": float(low), "hi_hz": float(high), "strongest_hz": float(peak)}
+        for low, high, peak in zip(
+            data["freq_lo"], data["freq_hi"], data["strongest_hz"], strict=True
+        )
+    ]
     document["time_end_s"] = audio.samples.shape[0] / audio.sample_rate
     return document
 
@@ -430,6 +460,7 @@ def build_t06(audio: Decoded, shared: dict) -> dict:
         "onset-autocorr-v1",
         [
             "Candidates are onset-autocorrelation peaks between 45 and 200 BPM.",
+            "Candidate bar height is normalized autocorrelation at that lag, not onset strength.",
             "Half-time and double-time readings are hypotheses, not a second measurement and not a beat grid.",
             "This does not establish meter, syncopation, or groove.",
         ],
@@ -440,13 +471,7 @@ def build_t06(audio: Decoded, shared: dict) -> dict:
     document["series"]["lines"].append(
         _line("Onset strength", data["onset_t"][::step], data["onset"][::step], "score")
     )
-    document["series"]["bars"] = [
-        {"label": f"{item['bpm']:.1f} BPM", "value": item["acf"]} for item in data["candidates"]
-    ]
-    for item in data["hypotheses"]:
-        document["series"]["bars"].append(
-            {"label": f"{item['relation']} {item['bpm']:.1f} BPM", "value": item["acf"]}
-        )
+    document["series"]["bars"] = _pulse_bars(data["candidates"], data["hypotheses"])
     if data["candidates"]:
         top = data["candidates"][0]["bpm"]
         document["caveats"].append(
@@ -455,8 +480,8 @@ def build_t06(audio: Decoded, shared: dict) -> dict:
         )
         if data["hypotheses"]:
             document["caveats"].append(
-                "Half-time and double-time bars are other autocorrelation peaks near twice or "
-                "half that period. They are not made by multiplying the displayed tempo."
+                "Half-time and double-time labels mark other autocorrelation peaks near twice or "
+                "half that period. They are not a second copy of that peak and not a multiplied tempo."
             )
         else:
             document["caveats"].append(
@@ -470,6 +495,37 @@ def build_t06(audio: Decoded, shared: dict) -> dict:
         document["caveats"].append("No pulse candidate rose above a steady or silent onset curve.")
         document["summary"] = [_summary("Pulse candidates", "none")]
     return document
+
+
+def _pulse_key(item: dict) -> tuple[float, float]:
+    return (round(float(item["bpm"]), 4), round(float(item["acf"]), 6))
+
+
+def _pulse_bars(candidates: list[dict], hypotheses: list[dict]) -> list[dict]:
+    relations: dict[tuple[float, float], list[str]] = {}
+    for item in hypotheses:
+        bucket = relations.setdefault(_pulse_key(item), [])
+        if item["relation"] not in bucket:
+            bucket.append(item["relation"])
+    bars: list[dict] = []
+    seen: set[tuple[float, float]] = set()
+    for item in candidates:
+        key = _pulse_key(item)
+        if key in seen:
+            continue
+        seen.add(key)
+        label = f"{item['bpm']:.1f} BPM"
+        extra = relations.get(key)
+        if extra:
+            label = f"{label} ({', '.join(extra)})"
+        bars.append({"label": label, "value": item["acf"]})
+    for item in hypotheses:
+        key = _pulse_key(item)
+        if key in seen:
+            continue
+        seen.add(key)
+        bars.append({"label": f"{item['bpm']:.1f} BPM ({item['relation']})", "value": item["acf"]})
+    return bars
 
 
 def build_t07(audio: Decoded, shared: dict) -> dict:
