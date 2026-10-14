@@ -11,7 +11,7 @@ Follow `docs/01_TECHNICAL_MVP_SPEC.md` and `docs/04_TECHNICAL_CHART_REQUIREMENTS
 
 ## Milestones
 
-Milestone 0 is `e4f1223`: WAV import, playback, and charts left `not_run`. Milestone 1 is `0f7d7aa`: the analysis worker and charts T01–T10. Preserve that implementation. It is not a validated release. Do not start Milestone 2 (timed lyrics, ZIP export, album comparison, or a narrative client) unless the user asks.
+Milestone 0 is `e4f1223`: WAV import, playback, and charts left `not_run`. Milestone 1 is accepted at `a387bb2`: analysis version `m1-v3` and charts T01–T10. Preserve that implementation. M2-A lyric evidence is authorized. Do not start M2-B, M2-C, ZIP export, album comparison, or a narrative client unless the user asks.
 
 ## Architecture
 

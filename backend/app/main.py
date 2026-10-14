@@ -11,7 +11,7 @@ from typing import Literal
 
 from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from app.audio import (
@@ -29,16 +29,35 @@ from app.audio import (
 from app.charts import KINDS, not_run
 from app.config import Settings, load_settings
 from app.db import asset_dict, connect, project_dict
+from app.lyrics import (
+    LYRIC_MAX_BYTES,
+    LyricError,
+    canonical_evidence,
+    create_annotation,
+    delete_annotation,
+    delete_lyrics,
+    list_annotations,
+    load_document,
+    lyric_kind,
+    require_membership,
+    source_bytes,
+    store_upload,
+    update_segment,
+    verify_segment,
+)
 from app.measure import ALGORITHM_VERSION, PARAMS_HASH
 from app.pipeline import analysis_dir, empty_registry, public_summary
 from app.worker import AnalysisWorker
 
 
 class AppError(Exception):
-    def __init__(self, status: int, code: str, message: str) -> None:
+    def __init__(
+        self, status: int, code: str, message: str, extra: dict | None = None
+    ) -> None:
         self.status = status
         self.code = code
         self.message = message
+        self.extra = extra or {}
 
 
 class ErrorBody(BaseModel):
@@ -189,6 +208,106 @@ class Job(BaseModel):
     error: str | None = None
 
 
+class LyricSegmentOut(BaseModel):
+    id: str
+    ordinal: int
+    source_cue: str | None
+    text: str
+    start_s: float | None
+    end_s: float | None
+    timing_origin: Literal["unplaced", "subtitle_supplied", "manual_edit", "manual_verified"]
+    artist_verified: bool
+    note: str
+    usable: bool
+
+
+class LyricValidationOut(BaseModel):
+    segment_id: str | None
+    code: Literal[
+        "overlap",
+        "out_of_range",
+        "empty_cue",
+        "reversed_time",
+        "malformed_time",
+        "unparsed",
+    ]
+    detail: str
+
+
+class LyricDocumentOut(BaseModel):
+    id: str
+    project_id: str
+    asset_id: str
+    upload_id: str
+    source_kind: Literal["txt", "md", "srt"]
+    source_sha256: str
+    original_name: str
+    revision: int
+    segments: list[LyricSegmentOut]
+    validation: list[LyricValidationOut]
+
+
+class LyricSegmentUpdate(BaseModel):
+    expected_revision: int = Field(ge=1)
+    text: str | None = None
+    start_s: float | None = None
+    end_s: float | None = None
+    note: str | None = None
+    clear_timing: bool = False
+
+
+class LyricVerify(BaseModel):
+    expected_revision: int = Field(ge=1)
+    verified: bool
+
+
+class AnnotationIn(BaseModel):
+    start_s: float
+    end_s: float
+    text: str = Field(min_length=1, max_length=2000)
+    segment_id: str | None = None
+
+
+class AnnotationOut(BaseModel):
+    id: str
+    project_id: str
+    asset_id: str
+    segment_id: str | None
+    start_s: float
+    end_s: float
+    text: str
+    created_at: str
+
+
+class EvidenceRef(BaseModel):
+    id: str
+    evidence_class: str
+    name: str
+    interval_s: list[float] | None
+    value: float | str | None
+    unit: str | None
+    method: str
+    analysis_version: Literal["m1-v3"] | None
+    lyric_document_id: str | None
+    lyric_revision: int | None
+    cites: list[str]
+    caveat: str
+    persisted: bool
+
+
+class CanonicalEvidence(BaseModel):
+    asset_id: str
+    project_id: str
+    analysis_version: Literal["m1-v3"] | None
+    lyric_document_id: str | None
+    lyric_revision: int | None
+    records: list[EvidenceRef]
+
+
+def _lyric(exc: LyricError) -> AppError:
+    return AppError(exc.status, exc.code, exc.message, exc.extra)
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -290,16 +409,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=[settings.cors_origin],
         allow_credentials=False,
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["*"],
         expose_headers=["Accept-Ranges", "Content-Range", "Content-Length"],
     )
 
     @app.exception_handler(AppError)
     async def app_error(_request: Request, exc: AppError) -> JSONResponse:
-        return JSONResponse(
-            status_code=exc.status, content={"error": exc.code, "message": exc.message}
-        )
+        content = {"error": exc.code, "message": exc.message}
+        content.update(exc.extra)
+        return JSONResponse(status_code=exc.status, content=content)
 
     @app.get("/api/health", response_model=Health)
     def health() -> Health:
@@ -609,5 +728,158 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "updated_at": row["updated_at"],
             "error": row["error"],
         }
+
+    @app.post(
+        "/api/projects/{project_id}/assets/{asset_id}/lyrics",
+        response_model=LyricDocumentOut,
+        status_code=201,
+    )
+    async def upload_lyrics(
+        project_id: str,
+        asset_id: str,
+        file: UploadFile = File(...),  # noqa: B008
+    ) -> dict:
+        try:
+            require_membership(connection, project_id, asset_id)
+            lyric_kind(file.filename or "")
+            tmp = settings.data_root / "tmp" / f"{uuid.uuid4().hex}.part"
+            sha_ignored, _size = await spool_upload(file, tmp, LYRIC_MAX_BYTES)
+            raw = tmp.read_bytes()
+            tmp.unlink(missing_ok=True)
+            del sha_ignored
+            return store_upload(
+                connection,
+                settings.data_root,
+                project_id,
+                asset_id,
+                file.filename or "",
+                raw,
+            )
+        except LyricError as exc:
+            raise _lyric(exc) from exc
+
+    @app.get(
+        "/api/projects/{project_id}/assets/{asset_id}/lyrics",
+        response_model=LyricDocumentOut,
+    )
+    def get_lyrics(project_id: str, asset_id: str) -> dict:
+        try:
+            document = load_document(connection, project_id, asset_id)
+        except LyricError as exc:
+            raise _lyric(exc) from exc
+        if document is None:
+            raise AppError(404, "no_lyrics", "No lyric document is attached.")
+        return document
+
+    @app.get("/api/projects/{project_id}/assets/{asset_id}/lyrics/source")
+    def lyric_source(project_id: str, asset_id: str) -> Response:
+        try:
+            body = source_bytes(connection, settings.data_root, project_id, asset_id)
+        except LyricError as exc:
+            raise _lyric(exc) from exc
+        return Response(content=body, media_type="text/plain; charset=utf-8")
+
+    @app.delete(
+        "/api/projects/{project_id}/assets/{asset_id}/lyrics",
+        status_code=204,
+    )
+    def remove_lyrics(project_id: str, asset_id: str) -> Response:
+        try:
+            delete_lyrics(connection, settings.data_root, project_id, asset_id)
+        except LyricError as exc:
+            raise _lyric(exc) from exc
+        return Response(status_code=204)
+
+    @app.put(
+        "/api/projects/{project_id}/assets/{asset_id}/lyric-segments/{segment_id}",
+        response_model=LyricDocumentOut,
+    )
+    def put_segment(
+        project_id: str, asset_id: str, segment_id: str, body: LyricSegmentUpdate
+    ) -> dict:
+        try:
+            return update_segment(
+                connection,
+                project_id,
+                asset_id,
+                segment_id,
+                body.expected_revision,
+                body.text,
+                body.start_s,
+                body.end_s,
+                body.note,
+                body.clear_timing,
+            )
+        except LyricError as exc:
+            raise _lyric(exc) from exc
+
+    @app.post(
+        "/api/projects/{project_id}/assets/{asset_id}/lyric-segments/{segment_id}/verify",
+        response_model=LyricDocumentOut,
+    )
+    def post_verify(
+        project_id: str, asset_id: str, segment_id: str, body: LyricVerify
+    ) -> dict:
+        try:
+            return verify_segment(
+                connection,
+                project_id,
+                asset_id,
+                segment_id,
+                body.expected_revision,
+                body.verified,
+            )
+        except LyricError as exc:
+            raise _lyric(exc) from exc
+
+    @app.get(
+        "/api/projects/{project_id}/assets/{asset_id}/annotations",
+        response_model=list[AnnotationOut],
+    )
+    def get_annotations(project_id: str, asset_id: str) -> list[dict]:
+        try:
+            return list_annotations(connection, project_id, asset_id)
+        except LyricError as exc:
+            raise _lyric(exc) from exc
+
+    @app.post(
+        "/api/projects/{project_id}/assets/{asset_id}/annotations",
+        response_model=AnnotationOut,
+        status_code=201,
+    )
+    def post_annotation(project_id: str, asset_id: str, body: AnnotationIn) -> dict:
+        try:
+            return create_annotation(
+                connection,
+                project_id,
+                asset_id,
+                body.start_s,
+                body.end_s,
+                body.text,
+                body.segment_id,
+            )
+        except LyricError as exc:
+            raise _lyric(exc) from exc
+
+    @app.delete(
+        "/api/projects/{project_id}/assets/{asset_id}/annotations/{annotation_id}",
+        status_code=204,
+    )
+    def remove_annotation(project_id: str, asset_id: str, annotation_id: str) -> Response:
+        try:
+            delete_annotation(connection, project_id, asset_id, annotation_id)
+        except LyricError as exc:
+            raise _lyric(exc) from exc
+        return Response(status_code=204)
+
+    @app.get(
+        "/api/projects/{project_id}/assets/{asset_id}/evidence",
+        response_model=CanonicalEvidence,
+    )
+    def project_evidence(project_id: str, asset_id: str) -> dict:
+        try:
+            return canonical_evidence(connection, settings.data_root, project_id, asset_id)
+        except LyricError as exc:
+            raise _lyric(exc) from exc
 
     return app

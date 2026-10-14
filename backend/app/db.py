@@ -30,6 +30,11 @@ def connect(database: Path) -> sqlite3.Connection:
         version = 1
     if version < 2:
         _migrate_v2(conn)
+        version = 2
+    if version < 3:
+        conn.executescript((MIGRATIONS / "003_lyrics.sql").read_text())
+        conn.execute("PRAGMA user_version = 3")
+        conn.commit()
     return conn
 
 
