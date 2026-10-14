@@ -44,3 +44,6 @@ data/
 Thumbs.db
 .idea/
 .vscode/
+
+# Internal research. Private lyrics and album notes; do not commit.
+references/album-observatory/
