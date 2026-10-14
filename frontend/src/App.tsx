@@ -4,14 +4,18 @@ import { Library } from "./library"
 
 type Route =
   | { name: "library" }
-  | { name: "analyzer"; assetId: string | null }
+  | { name: "analyzer"; assetId: string | null; projectId: string | null }
   | { name: "album" }
   | { name: "settings" }
 
 function readRoute(): Route {
   const url = new URL(window.location.href)
   if (url.pathname === "/analyzer") {
-    return { name: "analyzer", assetId: url.searchParams.get("asset") }
+    return {
+      name: "analyzer",
+      assetId: url.searchParams.get("asset"),
+      projectId: url.searchParams.get("project"),
+    }
   }
   if (url.pathname === "/album") {
     return { name: "album" }
@@ -25,10 +29,14 @@ function readRoute(): Route {
 function page(route: Route, go: (next: string) => void) {
   switch (route.name) {
     case "library":
-      return <Library onOpen={(assetId) => go(`/analyzer?asset=${assetId}`)} />
+      return (
+        <Library
+          onOpen={(assetId, openedProjectId) => go(`/analyzer?asset=${assetId}&project=${openedProjectId}`)}
+        />
+      )
     case "analyzer":
       return route.assetId ? (
-        <Analyzer assetId={route.assetId} />
+        <Analyzer assetId={route.assetId} projectId={route.projectId} />
       ) : (
         <>
           <h1 className="page-title">Analyzer</h1>
@@ -84,7 +92,14 @@ export function App() {
           <button
             type="button"
             aria-current={route.name === "analyzer" ? "page" : undefined}
-            onClick={() => go(route.name === "analyzer" && route.assetId ? `/analyzer?asset=${route.assetId}` : "/analyzer")}
+            onClick={() => {
+              if (route.name !== "analyzer" || !route.assetId) {
+                go("/analyzer")
+                return
+              }
+              const project = route.projectId ? `&project=${route.projectId}` : ""
+              go(`/analyzer?asset=${route.assetId}${project}`)
+            }}
           >
             Analyzer
           </button>

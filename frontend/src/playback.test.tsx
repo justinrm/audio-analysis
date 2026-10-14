@@ -22,6 +22,20 @@ vi.mock("wavesurfer.js", () => ({
         playPause() {},
         setTime() {},
         setVolume() {},
+        registerPlugin() {
+          return {
+            on() {
+              return () => undefined
+            },
+            clearRegions() {},
+            addRegion() {
+              return { setOptions() {}, remove() {} }
+            },
+            getRegions() {
+              return []
+            },
+          }
+        },
       }
     },
   },

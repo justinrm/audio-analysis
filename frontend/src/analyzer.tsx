@@ -1,10 +1,20 @@
 import { Pause, Play } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import WaveSurfer from "wavesurfer.js"
+import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js"
 import { api, streamUrl } from "./api/client"
 import type { Asset, ChartDocument, ChartSummary, Job, Peaks } from "./api/types"
 import { ChartView } from "./chart"
 import { clock, playbackCaption, TECHNICAL, toWavePeaks } from "./catalog"
+import {
+  cueColor,
+  cueKey,
+  LyricsWorkspace,
+  syncLyricRegions,
+  type LyricBridge,
+  type LyricCue,
+  type LyricRegionPlugin,
+} from "./lyrics"
 
 const STATUS_LABEL: Record<string, string> = {
   not_run: "not run",
@@ -27,6 +37,8 @@ export function TechnicalBoard({
   onSelect,
   onSeek,
   playhead = null,
+  assetId,
+  lyricsPanel = null,
 }: {
   charts: ChartSummary[]
   chartId: string
@@ -37,14 +49,22 @@ export function TechnicalBoard({
   onSelect: (chartId: string) => void
   onSeek: (seconds: number) => void
   playhead?: number | null
+  assetId?: string
+  lyricsPanel?: ReactNode
 }) {
   const [tab, setTab] = useState<"technical" | "lyrics">("technical")
+  const [holdLyrics, setHoldLyrics] = useState(false)
   const rows = TECHNICAL.map((item) => {
     const live = charts.find((chart) => chart.chart_kind === item.id)
     return { id: item.id, title: live?.title || item.title, status: live?.status ?? "not_run" }
   })
   const selected = rows.find((row) => row.id === chartId) ?? rows[0]
   const active = document?.chart_kind === selected.id ? document : null
+
+  useEffect(() => {
+    setTab("technical")
+    setHoldLyrics(false)
+  }, [assetId])
 
   return (
     <section>
@@ -57,7 +77,15 @@ export function TechnicalBoard({
         >
           Technical Analysis
         </button>
-        <button type="button" role="tab" aria-selected={tab === "lyrics"} onClick={() => setTab("lyrics")}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "lyrics"}
+          onClick={() => {
+            setHoldLyrics(true)
+            setTab("lyrics")
+          }}
+        >
           Lyrics & Inspiration
         </button>
       </div>
@@ -78,65 +106,74 @@ export function TechnicalBoard({
               </button>
             ))}
           </div>
-        ) : (
-          <div role="tabpanel">
-            <p>Text</p>
-            <p className="quiet">No lyric file is attached.</p>
-          </div>
-        )}
-        <div>
-          {tab === "technical" ? (
-            <>
-              <h2 className="m-0 font-serif text-3xl font-medium">
-                {selected.id} {selected.title}
-              </h2>
-              <p>Status: {STATUS_LABEL[active?.status ?? selected.status] ?? selected.status}</p>
-              {jobStatus ? <p>Analysis {STATUS_LABEL[jobStatus] ?? jobStatus}.</p> : null}
-              {active?.status === "ready" ? <ChartView chart={active} onSeek={onSeek} playhead={playhead} /> : null}
-              {active && active.status !== "ready" && active.status !== "not_run" ? (
-                <p>{active.not_available_reason || active.error}</p>
-              ) : null}
-              {(active?.status ?? selected.status) === "not_run" ? (
-                <p>Not run. Nothing has been measured for this recording.</p>
-              ) : null}
-              {selected.status !== "not_run" && !active ? <p>Loading this chart.</p> : null}
-              <button type="button" className="action" onClick={onAnalyze}>
-                Analyze
-              </button>
-              {notice ? (
-                <p className="notice" role="status">
-                  {notice}
-                </p>
-              ) : null}
-            </>
-          ) : (
-            <>
+        ) : null}
+        {holdLyrics && lyricsPanel ? (
+          <div style={{ display: tab === "lyrics" ? "contents" : "none" }}>{lyricsPanel}</div>
+        ) : null}
+        {tab === "lyrics" && !lyricsPanel ? (
+          <>
+            <div role="tabpanel">
+              <p>Text</p>
+              <p className="quiet">No lyric file is attached.</p>
+            </div>
+            <div>
               <h2 className="m-0 font-serif text-3xl font-medium">Lyrics & Inspiration</h2>
-              <p>Text upload is not in this milestone. Sung timing is not guessed.</p>
-            </>
-          )}
-        </div>
-        <aside>
-          <h2 className="m-0 font-serif text-2xl font-medium">Evidence</h2>
-          {tab === "technical" && active && active.status !== "not_run" ? (
-            <>
-              <p>{active.evidence_class}</p>
-              <p>
-                {active.method_id} {active.method_version}
+              <p>Open a recording to attach lyrics. Sung timing is not guessed.</p>
+            </div>
+            <aside>
+              <h2 className="m-0 font-serif text-2xl font-medium">Evidence</h2>
+              <p>No evidence yet.</p>
+            </aside>
+          </>
+        ) : null}
+        {tab === "technical" ? (
+          <div>
+            <h2 className="m-0 font-serif text-3xl font-medium">
+              {selected.id} {selected.title}
+            </h2>
+            <p>Status: {STATUS_LABEL[active?.status ?? selected.status] ?? selected.status}</p>
+            {jobStatus ? <p>Analysis {STATUS_LABEL[jobStatus] ?? jobStatus}.</p> : null}
+            {active?.status === "ready" ? <ChartView chart={active} onSeek={onSeek} playhead={playhead} /> : null}
+            {active && active.status !== "ready" && active.status !== "not_run" ? (
+              <p>{active.not_available_reason || active.error}</p>
+            ) : null}
+            {(active?.status ?? selected.status) === "not_run" ? (
+              <p>Not run. Nothing has been measured for this recording.</p>
+            ) : null}
+            {selected.status !== "not_run" && !active ? <p>Loading this chart.</p> : null}
+            <button type="button" className="action" onClick={onAnalyze}>
+              Analyze
+            </button>
+            {notice ? (
+              <p className="notice" role="status">
+                {notice}
               </p>
-              {active.summary.map((item) => (
-                <p key={item.label}>
-                  {item.label}: {item.value}
+            ) : null}
+          </div>
+        ) : null}
+        {tab === "technical" ? (
+          <aside>
+            <h2 className="m-0 font-serif text-2xl font-medium">Evidence</h2>
+            {active && active.status !== "not_run" ? (
+              <>
+                <p>{active.evidence_class}</p>
+                <p>
+                  {active.method_id} {active.method_version}
                 </p>
-              ))}
-              {active.caveats.map((item) => (
-                <p key={item}>{item}</p>
-              ))}
-            </>
-          ) : (
-            <p>No evidence yet.</p>
-          )}
-        </aside>
+                {active.summary.map((item) => (
+                  <p key={item.label}>
+                    {item.label}: {item.value}
+                  </p>
+                ))}
+                {active.caveats.map((item) => (
+                  <p key={item}>{item}</p>
+                ))}
+              </>
+            ) : (
+              <p>No evidence yet.</p>
+            )}
+          </aside>
+        ) : null}
       </div>
     </section>
   )
@@ -147,17 +184,27 @@ function Transport({
   peaks,
   seekRef,
   onTime,
+  cues,
+  activeCueId,
+  regionNonce,
+  lyricBridge,
 }: {
   asset: Asset
   peaks: Peaks
   seekRef: { current: (seconds: number) => void }
   onTime: (seconds: number) => void
+  cues: LyricCue[]
+  activeCueId: string | null
+  regionNonce: number
+  lyricBridge: { current: LyricBridge }
 }) {
   const host = useRef<HTMLDivElement>(null)
   const player = useRef<WaveSurfer | null>(null)
+  const regionsRef = useRef<LyricRegionPlugin | null>(null)
   const [time, setTime] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [error, setError] = useState("")
+  const [regionsReady, setRegionsReady] = useState(0)
   const duration = peaks.duration_s
 
   useEffect(() => {
@@ -182,6 +229,8 @@ function Transport({
       normalize: false,
     })
     player.current = wave
+    regionsRef.current = wave.registerPlugin(RegionsPlugin.create()) as unknown as LyricRegionPlugin
+    setRegionsReady((count) => count + 1)
     seekRef.current = (seconds: number) => {
       if (duration <= 0) {
         return
@@ -201,10 +250,38 @@ function Transport({
     return () => {
       seekRef.current = () => undefined
       unsubscribers.forEach((unsubscribe) => unsubscribe())
+      regionsRef.current = null
       wave.destroy()
       player.current = null
     }
   }, [asset.id, duration, peaks.buckets, seekRef, onTime])
+
+  useEffect(() => {
+    const plugin = regionsRef.current
+    if (!plugin || regionsReady === 0) {
+      return
+    }
+    return syncLyricRegions(
+      plugin,
+      cues,
+      (id, start, end) => lyricBridge.current.commit(id, start, end),
+      (id) => lyricBridge.current.pick(id),
+    )
+  }, [cues, lyricBridge, regionNonce, regionsReady])
+
+  useEffect(() => {
+    const plugin = regionsRef.current
+    if (!plugin || regionsReady === 0) {
+      return
+    }
+    for (const region of plugin.getRegions()) {
+      const cue = cues.find((item) => item.id === region.id)
+      if (!cue) {
+        continue
+      }
+      region.setOptions({ color: cueColor(cue.origin, cue.id === activeCueId) })
+    }
+  }, [activeCueId, cues, regionsReady])
 
   return (
     <div>
@@ -254,7 +331,7 @@ function Transport({
   )
 }
 
-export function Analyzer({ assetId }: { assetId: string }) {
+export function Analyzer({ assetId, projectId = null }: { assetId: string; projectId?: string | null }) {
   const [asset, setAsset] = useState<Asset | null>(null)
   const [peaks, setPeaks] = useState<Peaks | null>(null)
   const [charts, setCharts] = useState<ChartSummary[]>([])
@@ -267,6 +344,19 @@ export function Analyzer({ assetId }: { assetId: string }) {
   const onSeek = useCallback((seconds: number) => seekRef.current(seconds), [])
   const [playhead, setPlayhead] = useState<number | null>(null)
   const onTime = useCallback((seconds: number) => setPlayhead(seconds), [])
+  const [cues, setCues] = useState<LyricCue[]>([])
+  const [activeCueId, setActiveCueId] = useState<string | null>(null)
+  const [regionNonce, setRegionNonce] = useState(0)
+  const lyricBridge = useRef<LyricBridge>({
+    commit() {},
+    pick() {},
+  })
+  const onCues = useCallback((next: LyricCue[]) => {
+    setCues((prev) => (cueKey(prev) === cueKey(next) ? prev : next))
+  }, [])
+  const onActive = useCallback((id: string | null) => {
+    setActiveCueId((prev) => (prev === id ? prev : id))
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -279,6 +369,8 @@ export function Analyzer({ assetId }: { assetId: string }) {
     setLoadError("")
     setNotice("")
     setPlayhead(null)
+    setCues([])
+    setActiveCueId(null)
     api
       .asset(assetId)
       .then(async (next) => {
@@ -381,7 +473,18 @@ export function Analyzer({ assetId }: { assetId: string }) {
         <>
           <p>{`${asset.original_name}. Analysis ${asset.analysis_status}.`}</p>
           {asset.playback_status === "unavailable" ? <p>{playbackCaption(asset)}</p> : null}
-          {peaks ? <Transport asset={asset} peaks={peaks} seekRef={seekRef} onTime={onTime} /> : null}
+          {peaks ? (
+            <Transport
+              asset={asset}
+              peaks={peaks}
+              seekRef={seekRef}
+              onTime={onTime}
+              cues={cues}
+              activeCueId={activeCueId}
+              regionNonce={regionNonce}
+              lyricBridge={lyricBridge}
+            />
+          ) : null}
           {asset.playback_status === "ready" && !peaks && !loadError ? <p>Loading playback.</p> : null}
           <TechnicalBoard
             charts={charts}
@@ -393,6 +496,20 @@ export function Analyzer({ assetId }: { assetId: string }) {
             onSelect={setChartId}
             onSeek={onSeek}
             playhead={playhead}
+            assetId={asset.id}
+            lyricsPanel={
+              <LyricsWorkspace
+                projectId={projectId}
+                assetId={asset.id}
+                durationS={asset.duration_s}
+                playhead={playhead}
+                onSeek={onSeek}
+                onCues={onCues}
+                onActive={onActive}
+                bridge={lyricBridge}
+                onRegionReset={() => setRegionNonce((count) => count + 1)}
+              />
+            }
           />
         </>
       ) : null}

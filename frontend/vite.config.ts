@@ -8,10 +8,13 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 5173,
     proxy: {
-      "/api": "http://127.0.0.1:8000",
+      "/api":
+        (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env
+          .ARS_API_ORIGIN ?? "http://127.0.0.1:8000",
     },
   },
   test: {
     environment: "jsdom",
+    setupFiles: ["./src/test-setup.ts"],
   },
 })

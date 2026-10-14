@@ -56,7 +56,7 @@ describe("milestone 1 analysis state", () => {
     expect(screen.getAllByText(/not run/i).length).toBeGreaterThan(0)
     expect(screen.queryByRole("progressbar")).toBeNull()
     fireEvent.click(screen.getByRole("tab", { name: "Lyrics & Inspiration" }))
-    expect(screen.getByText(/text upload is not in this milestone/i)).toBeTruthy()
+    expect(screen.getByText(/sung timing is not guessed/i)).toBeTruthy()
     expect(screen.getByText(/no evidence yet/i)).toBeTruthy()
   })
 

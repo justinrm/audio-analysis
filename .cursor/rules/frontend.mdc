@@ -13,7 +13,7 @@ React 19 and TypeScript. Product contract: `docs/01_TECHNICAL_MVP_SPEC.md` and `
 - Render charts from the API chart document with ECharts. Do not compute loudness, spectra, or peaks in the browser. Use the document's units, axis scale, and time values. Seek only when the x-axis is time.
 - Show chart `status` (`not_run`, `ready`, `not_available`, `failed`) as that status. Show `evidence_class` separately. Do not turn one into the other.
 - Import API shapes from generated OpenAPI types in `frontend/src/api/`. Do not hand-maintain a second copy.
-- Lyrics stay an empty state until text upload exists. Album QC stays an empty state until comparison exists. Do not invent series, peaks, progress, or metrics.
+- The lyrics workspace edits an attached TXT, Markdown, or SRT file. It does not time lyrics from the audio or draw L01–L05. Album QC stays an empty state until comparison exists. Do not invent series, peaks, progress, or metrics.
 - Extend Vitest when a change would hide a wrong chart, status, or evidence class. A style or copy tweak does not need a new test.
 
 ```tsx

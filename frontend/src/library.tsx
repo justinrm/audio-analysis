@@ -14,7 +14,7 @@ function when(value: string): string {
 export function Library({
   onOpen,
 }: {
-  onOpen: (assetId: string) => void
+  onOpen: (assetId: string, projectId: string) => void
 }) {
   const [project, setProject] = useState<Project | null>(null)
   const [assets, setAssets] = useState<Asset[]>([])
@@ -143,7 +143,15 @@ export function Library({
                 <td>{asset.playback_status}</td>
                 <td>{when(asset.created_at)}</td>
                 <td>
-                  <button type="button" className="ghost" onClick={() => onOpen(asset.id)}>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => {
+                      if (project) {
+                        onOpen(asset.id, project.id)
+                      }
+                    }}
+                  >
                     Open
                   </button>
                 </td>

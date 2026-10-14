@@ -35,7 +35,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
@@ -260,6 +261,76 @@ select {
   margin-top: 1rem;
   padding-top: 0.8rem;
   border-top: 1px solid var(--color-line);
+}
+
+.lyric-row,
+.note-form,
+.lyric-source {
+  overflow-wrap: anywhere;
+}
+
+.lyric-row {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.lyric-row[aria-current="true"] {
+  background: var(--color-slate);
+  padding-left: 0.7rem;
+  padding-right: 0.7rem;
+}
+
+.lyric-row[data-playing="true"] {
+  box-shadow: inset 3px 0 0 var(--color-brass);
+}
+
+.lyric-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  align-items: end;
+}
+
+.lyric-row textarea,
+.lyric-times input,
+.note-form input,
+.note-form textarea {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  padding: 0.4rem 0.55rem;
+}
+
+.lyric-row textarea,
+.note-form textarea {
+  width: 100%;
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.lyric-times input,
+.note-form input[type="number"] {
+  width: 7.5rem;
+}
+
+.note-form {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.6rem 0 1.2rem;
+}
+
+.warn {
+  color: #e7c27a;
+}
+
+.advisory {
+  color: var(--color-mute);
+}
+
+.ghost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 @media (max-width: 860px) {

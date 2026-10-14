@@ -1,15 +1,18 @@
+import asyncio
 import hashlib
 import json
 import math
 import sqlite3
 from pathlib import Path
 
+import anyio
 import pytest
 from app.config import Settings
 from app.db import MIGRATIONS, _migrate_v2, connect
 from app.lyrics import word_count
 from app.main import create_app
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 from tests.test_milestone0 import _project, _upload
 from tests.wavgen import pcm_wav
@@ -497,3 +500,40 @@ def test_narrative_and_export_routes_are_absent(client: TestClient, tmp_path: Pa
     project_id, _asset_id = _study(client, tmp_path)
     assert client.post(f"/api/projects/{project_id}/narratives").status_code == 404
     assert client.post(f"/api/projects/{project_id}/exports").status_code == 404
+
+
+def test_concurrent_lyric_gets_return_the_same_document(settings: Settings, tmp_path: Path) -> None:
+    app = create_app(settings)
+    path = tmp_path / "tone.wav"
+    _wav(path)
+
+    async def burst() -> list[tuple[int, str | None]]:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as http:
+            project = (await http.post("/api/projects", json={"name": "Study"})).json()
+            uploaded = await http.post(
+                f"/api/projects/{project['id']}/assets",
+                files={"file": ("tone.wav", path.read_bytes(), "audio/wav")},
+            )
+            assert uploaded.status_code == 200, uploaded.text
+            asset_id = uploaded.json()["asset"]["id"]
+            lyric = await http.post(
+                f"/api/projects/{project['id']}/assets/{asset_id}/lyrics",
+                files={"file": ("lines.txt", b"first line\n", "text/plain")},
+            )
+            assert lyric.status_code == 201, lyric.text
+            url = f"/api/projects/{project['id']}/assets/{asset_id}/lyrics"
+
+            async def once() -> tuple[int, str | None]:
+                response = await http.get(url)
+                body = response.json()
+                return response.status_code, body.get("id")
+
+            return list(await asyncio.gather(*[once() for _ in range(32)]))
+
+    try:
+        results = anyio.run(burst)
+    finally:
+        app.state.db.close()
+    assert {status for status, _document_id in results} == {200}
+    assert len({document_id for _status, document_id in results}) == 1
