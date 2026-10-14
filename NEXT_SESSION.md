@@ -1,16 +1,17 @@
 # Next session
 
-Milestone 1 remediation is implemented and is waiting for the owner to accept it. Do not start Milestone 2.
+Milestone 1 is accepted at `a387bb2`. Analysis version is `m1-v3`. Charts T01–T10 stay on that measurement. Do not change it.
 
-## What changed after `0f7d7aa`
+M2-A is implemented and verified at `4d1e71b` and is not accepted. M2-B, the lyrics workspace, is implemented and verified in this tree and is not accepted. Do not start M2-C, ZIP export, album comparison, or a narrative client unless asked. Do not build the T02 stored-sample inspector unless asked.
 
-Algorithm version is `m1-v2`. A completed `m1-v1` cache is not reused.
+## What is in place
 
-- T01 plots a master min/max envelope at 4000 and 250 buckets, plus 100 ms and 1 s RMS. The sample peak is a separate marker.
-- Review markers render on time charts and as buttons. A click seeks playback. Labels stay listening checkpoints.
-- T02 compares equal-duration analysis windows against the file's mean RMS. The labels are windows, not song sections.
-- T04 stays on linear FFT bins, annotated with Nyquist and the bass/body/presence/air edges.
-- T06 shows half-time or double-time only when the autocorrelation has a peak near that period.
+- WAV import keeps the original bytes at `blobs/{sha256}`. Playback uses that blob for 16-bit PCM and `derivatives/{sha256}/pcm_s16le-triangular-v1.wav` for 24-bit PCM.
+- `POST /api/assets/{id}/analyze` returns 202. `python -m app.worker` runs the job. A completed `m1-v3` run with `metrics.json` is reused.
+- T01–T05 and T10 are measured when they apply. Mono T05 is `not_available` with evidence class `not_applicable`. T06–T09 stay estimated.
+- Lyric `.txt`, `.md`, and `.srt` files are stored, edited, timed by hand, and drawn as waveform regions when the interval is usable. SRT times are the subtitle file’s times. A stale revision returns 409 and does not overwrite the newer text.
+- Notes are annotations. Lyric edits do not rewrite `analysis/{sha256}/m1-v3/`.
+- L01–L05 are not implemented. Album QC is an empty state. Settings leave AI interpretation off.
 
 ## Commands
 
@@ -27,13 +28,17 @@ From `frontend/`:
 pnpm dev
 ```
 
-Open `http://127.0.0.1:5173/`. Without the worker, Analyze stays `queued`.
+Open `http://127.0.0.1:5173/`. Without the worker, a new analysis stays `queued`.
+
+`ARS_DATA_ROOT` is the API storage directory. Unset or empty uses `~/Library/Application Support/AudioReferenceStudio`. `ARS_API_ORIGIN` is only the Vite dev proxy for `/api`, read from the shell when `frontend/vite.config.ts` loads. Default `http://127.0.0.1:8000`.
 
 ## Checks last run
 
-- `uv run ruff check app tests` passed. `uv run pytest -q`: 33 passed, 1 httpx deprecation warning.
-- `pnpm typecheck`, `pnpm test` (4 passed), and `pnpm build` passed. The production bundle is over 500 kB because of ECharts.
+14 Oct 2026, on this working tree:
+
+- `backend/`: `uv run ruff check .` passed. `uv run pytest -q`: 58 passed. One Starlette warning: `httpx` with `starlette.testclient` is deprecated.
+- `frontend/`: `pnpm typecheck` passed. `pnpm test`: 4 files, 31 tests passed. `pnpm build` passed. The main JS chunk is about 1.45 MB, and Vite warned that it is over 500 kB.
 
 ## Not claimed
 
-Tempo, key, and section labels are estimates. The loudness check compares a 1 kHz sine with peak-minus-3.01 dB; it uses FFmpeg as the meter, not as a second opinion about FFmpeg. The operating-system file dialog was not used. Zoom on the chart was not clicked in the browser.
+Tempo, pitch-class, structure, and recurrence are estimates. A loudness, peak, or correlation figure is not a judgment that something is audible. Subtitle cues are not sung-word alignment. The lyrics workspace has not been checked in a browser in this handoff. Chart zoom shared with the waveform is not implemented.

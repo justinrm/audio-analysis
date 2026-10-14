@@ -7,11 +7,11 @@ alwaysApply: true
 
 Follow `docs/01_TECHNICAL_MVP_SPEC.md` and `docs/04_TECHNICAL_CHART_REQUIREMENTS.md`. Do not paste them into code or into these rules.
 
-`docs/03_CURSOR_AGENT_FIRST_SESSION.md` is the historical Milestone 0 session. `NEXT_SESSION.md` is an outdated handoff pending human validation of Milestone 1. Neither file accepts a later milestone.
+`docs/03_CURSOR_AGENT_FIRST_SESSION.md` is the historical Milestone 0 session. `NEXT_SESSION.md` is the current handoff. Neither file accepts a milestone.
 
 ## Milestones
 
-Milestone 0 is `e4f1223`: WAV import, playback, and charts left `not_run`. Milestone 1 is accepted at `a387bb2`: analysis version `m1-v3` and charts T01–T10. Preserve that implementation. M2-A lyric evidence is authorized. Do not start M2-B, M2-C, ZIP export, album comparison, or a narrative client unless the user asks.
+Milestone 0 is `e4f1223`: WAV import, playback, and charts left `not_run`. Milestone 1 is accepted at `a387bb2`: analysis version `m1-v3` and charts T01–T10. Preserve that implementation. M2-A is implemented and verified at `4d1e71b` and is not accepted. M2-B is implemented and verified and is not accepted. Do not start M2-C, ZIP export, album comparison, or a narrative client unless the user asks.
 
 ## Architecture
 
@@ -39,4 +39,4 @@ From `frontend/`: `pnpm typecheck && pnpm test && pnpm build`
 
 ## Local tools
 
-This repository has no git remote, so Origin cannot see it. Use Graphify only when `graphify-out/` exists. Playwright can set a file input; the Cursor browser cannot.
+Git remote `origin` is GitHub. Local `main` may be ahead of `origin/main`. Cursor Origin does not see a GitHub remote; use git for this repository. Use Graphify only when `graphify-out/` exists. Playwright can set a file input; the Cursor browser cannot.

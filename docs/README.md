@@ -1,22 +1,20 @@
-# Audio Reference Studio — MVP Planning Package
+# Audio Reference Studio
 
-This package is a **specification and code review**, not a completed web app.
+Audio Reference Studio is a local application for one recording at a time. Setup, current behavior, and milestone status are in the root [README](../README.md).
 
-## Start here
+## Requirements
 
-1. `01_TECHNICAL_MVP_SPEC.md` — product behavior, frontend/backend architecture, data model, API, both output modes, reliability, phased acceptance and tests.
-2. `02_SCRIPT_REVIEW.md` — source-grounded review of the four scripts inside the provided `Four_Song_Audit_Evidence.zip`, including reuse opportunities and 16-bit pitfalls.
-3. `03_CURSOR_AGENT_FIRST_SESSION.md` — bounded implementation instructions for Cursor Agent to build the **real working frontend/backend skeleton**.
-4. `04_TECHNICAL_CHART_REQUIREMENTS.md` — first-class technical dashboard chart catalog, shared contracts, technical ZIP content and validation gates.
+These documents are the product contract. Sections that describe L01–L05, ZIP export, an optional narrative, and Album QC are still requirements. They are not a description of what the application does today.
 
-## Source evidence reviewed
+1. [Technical MVP specification](01_TECHNICAL_MVP_SPEC.md) — product boundaries, screens, data, API, and milestone gates.
+2. [Technical chart requirements](04_TECHNICAL_CHART_REQUIREMENTS.md) — T01–T11, evidence labels, and validation intent.
+3. [Milestone 2 plan](superpowers/plans/2026-10-13-milestone-2.md) — lyric evidence, the workspace, and the five inspiration charts.
 
-`Four_Song_Audit_Evidence.zip` contained 37 entries. Reviewed four `.py` scripts (~641 source lines), four archived metrics records, pairwise comparison JSON, NPZ feature files and report/PNGs. The code was statically inspected and all four Python modules passed syntax parsing. End-to-end execution is not verified because the source WAVs are not packaged.
+## Historical notes
 
-The original four-song audit and `Little Mouse` technical charts define the diagnostic side of the application. The uploaded five `Praise Kink` charts and `Praise_Kink_Lyricist_Reference.md` define the complementary lyricist output and evidence vocabulary. Their chart-generating scripts are not included.
+1. [Script review](02_SCRIPT_REVIEW.md) — review of the legacy audit scripts that informed the measurements.
+2. [Milestone 0 session](03_CURSOR_AGENT_FIRST_SESSION.md) — the first implementation session. It does not accept a later milestone.
 
-## Proposed operating philosophy
+## Where the work stands
 
-Local first. Audio remains local. **Technical Analysis for WAV-only is a co-equal core product with the five-chart Lyricist Inspiration package; Album QC compares several tracks.** Measured and estimated observations are separated. User controls interpretation. Export `technical`, `lyricist`, or `combined` with no cloud or NIM requirement. Real frontend now, public access later only if justified.
-
-**Next decision:** Approve this plan or request changes, then supply Cursor with the first-session handoff and original evidence ZIP.
+Milestone 1 is accepted at `a387bb2`: analysis version `m1-v3` and charts T01–T10. M2-A and M2-B are implemented and verified. Neither is accepted. Album QC is an empty screen. The current handoff is [NEXT_SESSION.md](../NEXT_SESSION.md). A stalled frontend check is covered in [ENVIRONMENT.md](ENVIRONMENT.md).
