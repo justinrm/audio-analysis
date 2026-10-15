@@ -17,4 +17,4 @@ These documents are the product contract. Sections that describe L01–L05, ZIP 
 
 ## Where the work stands
 
-Milestone 1 is accepted at `a387bb2`: analysis version `m1-v3` and charts T01–T10. M2-A and M2-B are implemented and verified. Neither is accepted. Album QC is an empty screen. The current handoff is [NEXT_SESSION.md](../NEXT_SESSION.md). A stalled frontend check is covered in [ENVIRONMENT.md](ENVIRONMENT.md).
+Milestone 1 is accepted at `a387bb2`: analysis version `m1-v3` and charts T01–T10. M2-A and M2-B are accepted by the owner on 2026-10-14. Milestone 2 as a whole is not accepted. M2-C is not accepted. Album QC is an empty screen. The current handoff is [NEXT_SESSION.md](../NEXT_SESSION.md). A stalled frontend check is covered in [ENVIRONMENT.md](ENVIRONMENT.md). Acceptance evidence is [qa/m2a-m2b-2026-10-15.md](qa/m2a-m2b-2026-10-15.md).

@@ -2,7 +2,7 @@
 
 Milestone 1 is accepted at `a387bb2`. Analysis version is `m1-v3`. Charts T01–T10 stay on that measurement. Do not change it.
 
-M2-A is implemented and verified at `4d1e71b` and is not accepted. M2-B, the lyrics workspace, is implemented and verified in this tree and is not accepted. Do not start M2-C, ZIP export, album comparison, or a narrative client unless asked. Do not build the T02 stored-sample inspector unless asked.
+M2-A is accepted by the owner on 2026-10-14 at `4d1e71b`. M2-B, the lyrics workspace, is accepted by the owner on 2026-10-14 at `d1f29a7`. That acceptance is recorded in `.cursor/rules/project.mdc`. Milestone 2 as a whole is not accepted. Do not start M2-C, ZIP export, album comparison, or a narrative client unless asked. Do not build the T02 stored-sample inspector unless asked.
 
 ## What is in place
 
@@ -38,7 +38,8 @@ Open `http://127.0.0.1:5173/`. Without the worker, a new analysis stays `queued`
 
 - `backend/`: `uv run ruff check .` passed. `uv run pytest -q`: 58 passed. One Starlette warning: `httpx` with `starlette.testclient` is deprecated.
 - `frontend/`: `pnpm typecheck` passed. `pnpm test`: 4 files, 31 tests passed. `pnpm build` passed. The main JS chunk is about 1.45 MB, and Vite warned that it is over 500 kB.
+- Browser QA in [docs/qa/m2a-m2b-2026-10-15.md](docs/qa/m2a-m2b-2026-10-15.md) (2026-10-15 UTC) passed for the lyric ingestion, editing, persistence, timing, annotations, conflict protection, concurrent reads, playback continuity, and restart behavior it executed. No M2-A or M2-B functional defect was identified in those executed tests. That record's "Not tested" section was not run. Owner acceptance on 2026-10-14 cites it. This handoff does not itself accept a milestone.
 
 ## Not claimed
 
-Tempo, pitch-class, structure, and recurrence are estimates. A loudness, peak, or correlation figure is not a judgment that something is audible. Subtitle cues are not sung-word alignment. The lyrics workspace has not been checked in a browser in this handoff. Chart zoom shared with the waveform is not implemented.
+Tempo, pitch-class, structure, and recurrence are estimates. A loudness, peak, or correlation figure is not a judgment that something is audible. Subtitle cues are not sung-word alignment. Chart zoom shared with the waveform is not implemented.

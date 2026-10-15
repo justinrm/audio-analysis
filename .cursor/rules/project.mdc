@@ -11,7 +11,9 @@ Follow `docs/01_TECHNICAL_MVP_SPEC.md` and `docs/04_TECHNICAL_CHART_REQUIREMENTS
 
 ## Milestones
 
-Milestone 0 is `e4f1223`: WAV import, playback, and charts left `not_run`. Milestone 1 is accepted at `a387bb2`: analysis version `m1-v3` and charts T01–T10. Preserve that implementation. M2-A is implemented and verified at `4d1e71b` and is not accepted. M2-B is implemented and verified and is not accepted. Do not start M2-C, ZIP export, album comparison, or a narrative client unless the user asks.
+Milestone 0 is `e4f1223`: WAV import, playback, and charts left `not_run`. Milestone 1 is accepted at `a387bb2`: analysis version `m1-v3` and charts T01–T10. Preserve that implementation. M2-A is accepted by the owner on 2026-10-14 at `4d1e71b`. M2-B is accepted by the owner on 2026-10-14 at `d1f29a7`. Milestone 2 as a whole is not accepted. M2-C is not accepted. Do not start M2-C, ZIP export, album comparison, or a narrative client unless the user asks.
+
+The M2-A and M2-B acceptance cites `docs/qa/m2a-m2b-2026-10-15.md`. Backend: Ruff passed; pytest 58 passed. Frontend: typecheck passed; Vitest 31 passed; build passed. Browser QA passed for the lyric ingestion, editing, persistence, timing, annotations, conflict protection, concurrent reads, playback continuity, and restart behavior that report executed. No M2-A or M2-B functional defect was identified in those executed tests. The report's "Not tested" section lists scenarios this acceptance does not cover.
 
 ## Architecture
 

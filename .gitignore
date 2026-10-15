@@ -47,3 +47,6 @@ Thumbs.db
 
 # Internal research. Private lyrics and album notes; do not commit.
 references/album-observatory/
+
+# Local agent QA output. Do not commit.
+/.gstack/

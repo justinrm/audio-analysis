@@ -64,7 +64,7 @@ The technical panel shows the chart’s evidence class, method, `m1-v3` version,
 
 ### Lyrics workspace
 
-M2-A stores lyric files, parses them, and keeps revisions. M2-B is the workspace on that API. Both are implemented here. Neither is an accepted milestone. See [Status](#status).
+M2-A stores lyric files, parses them, and keeps revisions. M2-B is the workspace on that API. The owner accepted both slices on 2026-10-14. Milestone 2 as a whole is not accepted. See [Status](#status).
 
 - `.txt`, `.md`, and `.srt` uploads, up to 1 MiB. The original lyric bytes are kept under `lyrics/{sha256}`.
 - Text and Markdown lines start `unplaced`. SRT cues that parse into a forward interval start as `subtitle_supplied`. Reversed, malformed, or out-of-range cues are kept and left off the time axis.
@@ -212,9 +212,13 @@ Milestone 0, commit `e4f1223`, is the local studio: WAV import, playback, and ch
 
 Milestone 1 is accepted at `a387bb2`. Analysis version is `m1-v3`. Charts T01–T10 are the accepted technical set. Preserve that measurement behavior.
 
-M2-A, commit `4d1e71b`, adds lyric storage, parsing, revisions, annotations, and evidence reads. `backend/tests/test_lyrics.py` covers that work. No owner acceptance is recorded for M2-A.
+M2-A, commit `4d1e71b`, adds lyric storage, parsing, revisions, annotations, and evidence reads. `backend/tests/test_lyrics.py` covers that work. The owner accepted M2-A on 2026-10-14.
 
-M2-B is the lyrics workspace in the working tree, covered by `frontend/src/lyrics.test.tsx`. It is not an accepted milestone.
+M2-B, commit `d1f29a7`, is the lyrics workspace, covered by `frontend/src/lyrics.test.tsx`. The owner accepted M2-B on 2026-10-14.
+
+Milestone 2 as a whole is not accepted. M2-C is not accepted.
+
+That acceptance cites [docs/qa/m2a-m2b-2026-10-15.md](docs/qa/m2a-m2b-2026-10-15.md). Backend: Ruff passed; pytest 58 passed. Frontend: typecheck passed; Vitest 31 passed; build passed. Browser QA passed for tested lyric ingestion, editing, persistence, timing, annotations, conflict protection, concurrent reads, playback continuity, and restart behavior. No M2-A or M2-B functional defect was identified in the executed tests. The report's "Not tested" section lists scenarios this acceptance does not cover.
 
 Still ahead, and not started as product behavior:
 
@@ -229,7 +233,7 @@ The product contract is [docs/01_TECHNICAL_MVP_SPEC.md](docs/01_TECHNICAL_MVP_SP
 - [Technical MVP specification](docs/01_TECHNICAL_MVP_SPEC.md) — product boundaries, screens, and milestone gates
 - [Technical chart requirements](docs/04_TECHNICAL_CHART_REQUIREMENTS.md) — T01–T11, evidence labels, and validation intent
 - [Milestone 2 plan](docs/superpowers/plans/2026-10-13-milestone-2.md) — lyric evidence, the workspace, and L01–L05
-- [Implementation audit](docs/album_observatory_followup_audit.md) — what the tree implemented, and which milestone claims are not owner acceptance
+- [Implementation audit](docs/album_observatory_followup_audit.md) — snapshot from before owner acceptance of M2-A and M2-B. It is not an acceptance decision.
 - [Local toolchain note](docs/ENVIRONMENT.md) — recovering a stalled Vite or Vitest run
 
 `docs/README.md` is the index to the requirements and the running app. `NEXT_SESSION.md` is the current handoff and does not accept a milestone. `docs/03_CURSOR_AGENT_FIRST_SESSION.md` is the historical Milestone 0 session.
