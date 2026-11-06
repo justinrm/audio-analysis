@@ -59,6 +59,23 @@ export function clock(seconds: number, precise = false): string {
   return `${body}.${tenth}`
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  not_run: "Not run",
+  not_available: "Not available",
+  ready: "Ready",
+  failed: "Failed",
+  queued: "Queued",
+  running: "Running",
+  completed: "Completed",
+  canceled: "Canceled",
+  unavailable: "Unavailable",
+}
+
+/** Display word for a job, chart, or playback status. Evidence class is not a status. */
+export function statusLabel(value: string): string {
+  return STATUS_LABEL[value] ?? value
+}
+
 export function formatLabel(asset: Pick<Asset, "subtype" | "sample_rate" | "channels">): string {
   const bits = asset.subtype === "pcm_16" ? "16-bit PCM" : "24-bit PCM"
   const khz = asset.sample_rate / 1000

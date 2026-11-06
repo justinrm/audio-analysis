@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import type { ChartDocument, ChartSummary } from "./api/types"
 import { TechnicalBoard } from "./analyzer"
-import { playbackCaption, TECHNICAL } from "./catalog"
+import { playbackCaption, statusLabel, TECHNICAL } from "./catalog"
 
 vi.mock("echarts", () => ({
   init: () => ({
@@ -121,12 +121,21 @@ describe("milestone 1 analysis state", () => {
       />,
     )
     expect(screen.getByText(/-14\.2 LUFS/)).toBeTruthy()
-    expect(screen.getByRole("button", { name: /T03/i }).textContent).toMatch(/failed/)
+    expect(screen.getByRole("button", { name: /T03/i }).textContent).toMatch(/Failed/)
     expect(screen.queryByRole("progressbar")).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: /sample peak/i }))
     expect(seen).toEqual([1.25])
     fireEvent.click(screen.getByRole("button", { name: /T03/i }))
     expect(seen).toEqual([1.25, "T03"])
+  })
+
+  it("labels job and playback status without rewriting evidence class", () => {
+    expect(statusLabel("not_run")).toBe("Not run")
+    expect(statusLabel("not_available")).toBe("Not available")
+    expect(statusLabel("completed")).toBe("Completed")
+    expect(statusLabel("unavailable")).toBe("Unavailable")
+    expect(statusLabel("measured")).toBe("measured")
+    expect(statusLabel("textual")).toBe("textual")
   })
 
   it("distinguishes a 24-bit master from the playback copy", () => {

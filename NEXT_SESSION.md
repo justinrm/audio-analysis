@@ -12,6 +12,7 @@ M2-A is accepted by the owner on 2026-10-14 at `4d1e71b`. M2-B, the lyrics works
 - Lyric `.txt`, `.md`, and `.srt` files are stored, edited, timed by hand, and drawn as waveform regions when the interval is usable. SRT times are the subtitle file’s times. A stale revision returns 409 and does not overwrite the newer text.
 - Notes are annotations. Lyric edits do not rewrite `analysis/{sha256}/m1-v3/`.
 - L01–L05 are not implemented. Album QC is an empty state. Settings leave AI interpretation off.
+- Studio Precision Pass 1 (shell, language, and library) is accepted by the owner on 2026-11-06. Pass 2 and Pass 3 are not started. The Pass 2 plot-width rule is in `docs/design/studio-precision.md` and is not implemented.
 
 ## Commands
 

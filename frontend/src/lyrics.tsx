@@ -91,7 +91,7 @@ export function cueLabel(segment: Pick<LyricSegmentOut, "source_cue" | "ordinal"
 export function cueColor(origin: LyricCue["origin"], active: boolean): string {
   switch (origin) {
     case "subtitle_supplied":
-      return active ? "rgba(176, 141, 87, 0.72)" : "rgba(176, 141, 87, 0.32)"
+      return active ? "rgba(196, 163, 106, 0.72)" : "rgba(196, 163, 106, 0.32)"
     case "manual_edit":
       return active ? "rgba(183, 192, 200, 0.7)" : "rgba(183, 192, 200, 0.28)"
     case "manual_verified":

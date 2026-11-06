@@ -5,7 +5,7 @@ import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js"
 import { api, streamUrl } from "./api/client"
 import type { Asset, ChartDocument, ChartSummary, Job, Peaks } from "./api/types"
 import { ChartView } from "./chart"
-import { clock, playbackCaption, TECHNICAL, toWavePeaks } from "./catalog"
+import { clock, playbackCaption, statusLabel, TECHNICAL, toWavePeaks } from "./catalog"
 import {
   cueColor,
   cueKey,
@@ -15,17 +15,6 @@ import {
   type LyricCue,
   type LyricRegionPlugin,
 } from "./lyrics"
-
-const STATUS_LABEL: Record<string, string> = {
-  not_run: "not run",
-  not_available: "not available",
-  ready: "ready",
-  failed: "failed",
-  queued: "queued",
-  running: "running",
-  completed: "completed",
-  canceled: "canceled",
-}
 
 export function TechnicalBoard({
   charts,
@@ -102,7 +91,7 @@ export function TechnicalBoard({
               >
                 {item.id} {item.title}
                 <br />
-                <small>{STATUS_LABEL[item.status] ?? item.status}</small>
+                <small>{statusLabel(item.status)}</small>
               </button>
             ))}
           </div>
@@ -131,8 +120,8 @@ export function TechnicalBoard({
             <h2 className="m-0 font-serif text-3xl font-medium">
               {selected.id} {selected.title}
             </h2>
-            <p>Status: {STATUS_LABEL[active?.status ?? selected.status] ?? selected.status}</p>
-            {jobStatus ? <p>Analysis {STATUS_LABEL[jobStatus] ?? jobStatus}.</p> : null}
+            <p>Status: {statusLabel(active?.status ?? selected.status)}</p>
+            {jobStatus ? <p>Analysis {statusLabel(jobStatus)}.</p> : null}
             {active?.status === "ready" ? <ChartView chart={active} onSeek={onSeek} playhead={playhead} /> : null}
             {active && active.status !== "ready" && active.status !== "not_run" ? (
               <p>{active.not_available_reason || active.error}</p>
@@ -218,9 +207,9 @@ function Transport({
       peaks: toWavePeaks(peaks.buckets),
       duration,
       height: 96,
-      waveColor: "#8d8478",
-      progressColor: "#b08d57",
-      cursorColor: "#e6e0d4",
+      waveColor: "#8b95a3",
+      progressColor: "#c4a36a",
+      cursorColor: "#e8e6e1",
       cursorWidth: 1,
       barWidth: 2,
       barGap: 1,
@@ -471,7 +460,7 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
       {!asset && !loadError ? <p>Loading the recording.</p> : null}
       {asset ? (
         <>
-          <p>{`${asset.original_name}. Analysis ${asset.analysis_status}.`}</p>
+          <p>{`${asset.original_name}. Analysis ${statusLabel(asset.analysis_status)}.`}</p>
           {asset.playback_status === "unavailable" ? <p>{playbackCaption(asset)}</p> : null}
           {peaks ? (
             <Transport

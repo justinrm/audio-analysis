@@ -357,7 +357,7 @@ function markerLayer(chart: ChartDocument): echarts.MarkLineComponentOption | un
   return {
     symbol: "none",
     animation: false,
-    lineStyle: { color: "#b08d57", type: "dashed" },
+    lineStyle: { color: "#c4a36a", type: "dashed" },
     data: chart.review_markers.map((marker) => ({ xAxis: marker.time_s, name: marker.label })),
   }
 }
