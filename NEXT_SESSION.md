@@ -4,7 +4,7 @@
 
 Read [PROJECT_STATUS.md](PROJECT_STATUS.md) for the accepted baseline and verification limits. Use the [documentation index](docs/README.md) for the approved requirements.
 
-The latest accepted implementation checkpoint is Milestone 2-C, accepted November 7, 2026, on `milestone-2c-lyricist-visualizations` from parent `c239341`. Studio Precision Pass 3, accepted the same day on `studio-precision-pass3` from parent `b35cdb1`, remains accepted. Pass 2 at `883275e` remains accepted. Commit `260cb677` is the Pass 3 readiness proposal. Commit `b35cdb1` is the documentation reconciliation. Neither of those two commits is the Pass 3 implementation acceptance. Milestone 2 overall is not accepted.
+The latest accepted implementation checkpoint is Milestone 2, accepted with exceptions on November 7, 2026. The implementation is on `main` at `ee72581`. M2-A, M2-B, and M2-C remain accepted. Studio Precision Pass 3, accepted the same day on `studio-precision-pass3` from parent `b35cdb1`, remains accepted. Pass 2 at `883275e` remains accepted. Commit `260cb677` is the Pass 3 readiness proposal. Commit `b35cdb1` is the documentation reconciliation. Neither of those two commits is the Pass 3 implementation acceptance.
 
 The November 6 audit recorded GitHub `main` at `260cb677` and recorded the local Cursor branch, HEAD, upstream divergence, and worktree as unknown. That audit executed documentation checks only. [Verification history](PROJECT_STATUS.md#verification-history) separates prior recorded test runs from that audit's checks. See [Open items](PROJECT_STATUS.md#open-items) for the bundle, playback, assetless Analyzer, and contract issues that remain.
 
@@ -13,6 +13,11 @@ Historical pre-integration check: before the documentation patch was applied, lo
 `b35cdb1` reconciled the documentation and was on local `main` and `origin/main` before this branch. That reconciliation does not by itself accept Pass 3.
 
 ## Accepted baseline
+
+Milestone 2 is accepted with two deferred synchronization requirements.
+
+1. Waveform zoom and chart zoom are not synchronized. Chart zoom stays local to the chart on screen. Future acceptance: one visible time window is shared by the waveform and the file-time charts, and either surface can move it, without changing stored samples.
+2. A selected lyric region is navigable. The waveform highlight follows the playhead. L01 and L03 do not mark that region as the selected one. Future acceptance: the selected usable interval is identifiable on the waveform and on L01 and L03 together, including when other regions also contain the playhead.
 
 M2-C covers L01–L05 in Lyrics & Inspiration: the unified music-and-lyrics timeline, written phrasing and density, energy and dynamic contrast, spectral and textual repetition, and evidence-cited musical DNA and transferable principles. The charts read stored `m1-v3` evidence and the current lyric document. Shared playback and the existing revision and provenance semantics stay in place. Source hashes, `m1-v3`, T01–T10, and `png-r1` are unchanged.
 
@@ -26,17 +31,19 @@ Accepted limitations: native keyboard activation of the data-table controls was 
 
 ## Current handoff
 
-M2-C is the latest accepted implementation. Milestone 2 overall is not accepted. The next action is an owner-directed Milestone 2 overall acceptance review, or another explicitly authorized decision. Do not start Milestone 3.
+Milestone 2 is accepted with the two exceptions above. The [Milestone 3 export scope](docs/superpowers/plans/2026-11-07-milestone-3-exports.md) is ready for the owner. Implementation is not authorized.
+
+The next authorization must name the slice: M3-A Technical ZIP, M3-B Lyricist and Combined ZIP, both slices, or a replacement for one of the recommendations in that scope. A narrative client is a separate later authorization. Do not start Milestone 4.
 
 ## Not authorized
 
-Milestone 3 package exports, Lyricist PNG packages, Markdown reference packages, narrative AI, Album QC, T11, and unrelated technical debt are not authorized. M2-C acceptance is not a license to extend that work. Milestone 2 overall acceptance is a separate owner decision.
+Milestone 3 package exports, Lyricist PNG packages, Markdown reference packages, narrative AI, Album QC, T11, and unrelated technical debt are not authorized. Milestone 2 acceptance is not a license to start that work.
 
 ## Cursor handoff
 
 1. Run `git status --short --branch`, `git rev-parse HEAD`, and `git log -5 --oneline --decorate` in the local checkout. Preserve unrelated work.
-2. Wait for an owner-directed Milestone 2 overall acceptance review or another explicit scope decision. Do not start Milestone 3.
-3. Keep the M2-A, M2-B, M2-C, Pass 2, and Pass 3 acceptance records intact.
+2. Wait for the owner to authorize a named Milestone 3 slice. Do not start Milestone 4.
+3. Keep the Milestone 2 acceptance, both exceptions, and the Pass 2 and Pass 3 records intact.
 
 Protect `m1-v3`, T01–T10 stored data and methods, the original WAV bytes, waveform/transport continuity, lyric draft and revision semantics, evidence labels, and the independent use of each workspace.
 
