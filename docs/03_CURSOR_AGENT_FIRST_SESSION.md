@@ -1,5 +1,7 @@
 # Cursor Agent — First Implementation Session
 
+> **Historical prompt.** This file preserves the original Milestone 0 draft. Use [NEXT_SESSION.md](../NEXT_SESSION.md) for current work. The draft's Milestone 1 slice and queued-stub suggestion were superseded. The implemented Milestone 0 checkpoint returned HTTP 501 without creating an analysis job. The worker-backed HTTP 202 contract arrived with Milestone 1.
+
 ## Authority and boundaries
 
 Read **01_TECHNICAL_MVP_SPEC.md**, **02_SCRIPT_REVIEW.md**, and **04_TECHNICAL_CHART_REQUIREMENTS.md** before making changes. The project is a single-user, local-first audio analysis application with a real React frontend and Python backend. It has **two equal modes:** a complete technical analysis dashboard for WAV alone, and lyricist-focused musical inspiration views for WAV plus optional lyrics/SRT; Album QC compares tracks. It may later become a public product, but **do not add hosting, cloud infra, authentication, payments, telemetry, or paid AI calls now**.

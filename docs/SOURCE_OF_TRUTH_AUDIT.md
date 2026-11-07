@@ -1,0 +1,56 @@
+# Audio Reference Studio source-of-truth audit
+
+**Snapshot:** November 6, 2026 Pacific. GitHub `main` at [`260cb677`](https://github.com/justinrm/audio-analysis/commit/260cb677bb9b6d70fa866be13f0408c04b042ec5). This is the reconciliation record for that revision. Use [PROJECT_STATUS.md](../PROJECT_STATUS.md) for live checkpoint status.
+
+## Executive assessment
+
+The published implementation is beyond the October 12 planning context. Repository records identify M0, M1, M2-A, M2-B and Studio Precision Passes 1 and 2 as accepted, with different levels of supporting evidence. Pass 2 has a tracked owner-acceptance record and an implementation commit. The following commit adds a proposal for Pass 3 only. The immediate gate is a local checkout check and an owner scope decision on that proposal. Milestone 2 remains open. Current source supports T01–T10 and the lyric evidence/editing foundation. L01–L05, complete packages, an optional narrative client, and functional Album QC/T11 remain planned.
+
+The documents now separate approved requirements, accepted checkpoints, observed behavior, evidence of past tests, and next authorized work. Several shipped contracts remain narrower than the specification. The [decision register](OPEN_DECISIONS_AND_UNCERTAINTIES.md) keeps those differences visible.
+
+## Sources inspected and access limits
+
+| Source | Scope inspected |
+| --- | --- |
+| Supplied project files | All five supplied documents. The four numbered files match their GitHub `docs/` versions byte-for-byte at the audited revision. The October 12 ChatGPT Project Context is a separate project attachment, with no matching root repository file. |
+| Repository guidance | Root [README](../README.md), [handoff](../NEXT_SESSION.md), [docs index](README.md), all three known Cursor rules (`project.mdc`, `backend.mdc`, `frontend.mdc`), local toolchain note, technical requirements, and the Milestone 2 plan. |
+| Decision, design and QA records | October 15 UTC M2-A/M2-B QA, Studio Precision Pass 2 acceptance and Pass 3 readiness, and the Album Observatory reference review and follow-up audit. Prior owner instructions corroborate the M1 decision and authorization to formally accept M2-A/M2-B. |
+| GitHub evidence | Default branch `main` and branch results, 14 returned commits with changed-file metadata from the first planning commit through `260cb677`, and repository issue search. No other branch or issue was returned. The pinned head had no combined status entries or PR-triggered workflow results in the available view. |
+| Code and tests | FastAPI route and model declarations, settings, WAV probe and decoding, worker, pipeline, chart builders and PNG renderer, SQLite connection and lyric evidence, library/router/analyzer/chart/lyrics UI, dependency manifests, backend fixture sources and relevant frontend tests. The Milestone 0 API source was separately checked at `e4f1223`. |
+| Unavailable | Owner's local Cursor branch, upstream, worktree and untracked reports or private screenshots. A GitHub connector source audit succeeded. An authenticated shell checkout was unavailable. Raw application runs and private WAV fixtures were unavailable. Original owner acceptance messages for M0 and Passes 1/2 were unavailable, so the tracked records are cited with that limitation. No new app suite, browser QA or critical listening was performed. |
+
+## Authority and ownership
+
+| Subject | Owner | Supporting evidence |
+| --- | --- | --- |
+| Product requirements and architecture | [Technical MVP specification](01_TECHNICAL_MVP_SPEC.md) | Latest owner direction and the decision register's source links |
+| Technical/scientific charts | [Technical chart requirements](04_TECHNICAL_CHART_REQUIREMENTS.md) for T01–T11 | MVP §4B defines L01–L05. The M2 plan expands their proposed implementation. |
+| Current implementation and acceptance | [PROJECT_STATUS.md](../PROJECT_STATUS.md) | Pinned source, owner records, dated QA, and test fixtures |
+| Locked decisions and uncertainty | [Decision register](OPEN_DECISIONS_AND_UNCERTAINTIES.md) | Owner decisions, accepted design, specifications, and observed gaps |
+| Current handoff and authorization | [NEXT_SESSION.md](../NEXT_SESSION.md) | Owner authorization and implementation/acceptance status |
+
+The latest explicit owner decision controls. Accepted milestone records and approved decisions follow, then current requirements, verified implementation and tests, historical engineering evidence, and exploratory instructions. Source inspection can demonstrate divergence. Changing an approved requirement needs an owner decision.
+
+## Findings
+
+Severity is about continuity and evidence risk. High means the finding can cause unauthorized work, false acceptance, or a material scientific claim. Medium means it can mislead an implementation or QA session. Low means navigation or wording needs correction.
+
+| ID | Severity | Location and supporting evidence | Resolution |
+| --- | --- | --- | --- |
+| A1 | High | Supplied Project Context header, §§9–10, 13 and 14 describe a planning-only/M0 gate and an old filename. GitHub history contains application code from `fe0ee94` onward. [The Studio Precision record at the pinned revision](https://github.com/justinrm/audio-analysis/blob/260cb677bb9b6d70fa866be13f0408c04b042ec5/docs/design/studio-precision.md#L5-L23) records M0 through Pass 2. | Replace the stale context status and first-session directions with canonical links. Retain historical script and creative reference caveats. |
+| A2 | High | The session brief reports Pass 2 awaiting acceptance/commit. [`883275e`](https://github.com/justinrm/audio-analysis/commit/883275ed356305673494ffdc1f9e28c16ce589c7) records its implementation and acceptance. [`260cb677`](https://github.com/justinrm/audio-analysis/commit/260cb677bb9b6d70fa866be13f0408c04b042ec5) adds only the Pass 3 readiness report. Old `NEXT_SESSION.md` still says to plan Pass 3. | Mark Pass 2 accepted with record provenance. Make the next handoff review the existing proposal and compare the local checkout. Keep Pass 3 and M2-C unauthorized. |
+| A3 | High | Original first-session prompt, “Mission,” “API baseline” and “Execution discipline” combine an M1 slice, a queued stub, and a stop at M0. The later M0 boundary was M0-only, and [M0 source at `e4f1223`](https://github.com/justinrm/audio-analysis/blob/e4f1223b939d89cac957da9be503196da3c3b602/backend/app/main.py#L394-L404) returns 501. [The current API](../backend/app/main.py#L613) returns 202 and supports real worker execution. | Annotate the original prompt as historical and date the behavior change. Preserve the original text. |
+| A4 | High | Original root README §Status, docs index §Where the work stands, project Cursor rule §Milestones, and Studio Precision table duplicate current state. The root README ends §Status with wording that can make current code win over approved requirements. The M2 plan's opening tells agents to execute unchecked tasks. | Centralize status in `PROJECT_STATUS.md`, route Cursor through `NEXT_SESSION.md`, retain immutable approval links, and mark the M2 execution checklist historical. |
+| A5 | High | [Pass 3 proposal §7 at the pinned revision](https://github.com/justinrm/audio-analysis/blob/260cb677bb9b6d70fa866be13f0408c04b042ec5/docs/design/studio-precision-pass3.md#L346-L361) calls browser/PNG divergence accepted. Its introduction and implementation units say the owner has not authorized the pass. Chart §1/§4 and MVP §10 preserve shared evidence and consistency requirements. | Correct the approval language. Keep any temporary presentation exception pending owner review. See G6. |
+| A6 | High | MVP §§5/11 include integer PCM32, float WAV, and bounded decode. [Probe](../backend/app/audio.py#L88) rejects those formats, and [decoder](../backend/app/measure.py#L115) loads all frames. The approved stack names SoundFile, while [the shipped manifest](../backend/pyproject.toml) does not include it. | Clarify input and current dependency scope. Preserve the target and validation standard. Track decoder resource and multichannel limits. See G1. |
+| A7 | High | Chart §§1–3 and MVP §3 versus [chart builders](../backend/app/charts.py), [renderer](../frontend/src/chart.tsx), and [PNG writer](../backend/app/png.py). Confirmed issues include T03’s stored PSD unit, mixed axes on T02/T05, limited accessible alternatives, independent waveform/chart zoom, existing T02/T03 PNG bar omissions, and differences in T09/T10 deliverables. T04’s annotated linear data is allowed. | Preserve T01–T10 IDs and measurements. Record the gaps separately from any presentation or measurement change. See G2–G6 and G8. |
+| A8 | Medium | MVP §§3/7/8 targets delete, cancel, features, progress, export and comparison behavior. [FastAPI source](../backend/app/main.py) has different scoped lyric routes and only individual chart artifacts, with no cancel route or progress percentage. The chart contract names job lifecycle terms as chart statuses. | Label target versus shipped OpenAPI and preserve scoped lyric ownership. See G2 and G7. |
+| A9 | Medium | Root README §Current capabilities describes initial library selection but omits switching studies. It says every ready chart has a PNG. [Library source at the pinned revision](https://github.com/justinrm/audio-analysis/blob/260cb677bb9b6d70fa866be13f0408c04b042ec5/frontend/src/library.tsx#L36-L106) supports reopening studies. [Pipeline](../backend/app/pipeline.py#L27) isolates PNG failures. | Clarify both behaviors and keep the dated October browser observation as historical. |
+| A10 | Medium | M2 QA “Not tested,” Studio Precision §Verification and historical Album Observatory follow-up cover different checkpoints. The legacy script review excludes original WAVs. The current playback-unavailable report has no trace here. | Separate reported passes, skipped cases, fixtures and today's documentation checks. Preserve source limits and historical defects with explicit uncertainty. |
+| A11 | Low | October Project Context §14 lists a planning README and an alternate first-session filename. The actual filename is `docs/03_CURSOR_AGENT_FIRST_SESSION.md`. In-document package examples and planned source paths can resemble live files. | Link the live index and correct the source name. Label planned paths as target design and retain legacy filenames as provenance. |
+
+## Risk and verification disposition
+
+Acting on the old first-session or M2 checklist could restart completed work or begin M2-C before authorization. Using a current code path as the requirement could silently remove a scientific, export, or accessibility gate. Treating test counts or historical QA observations as a fresh local result could hide checkout drift or an untested case.
+
+The delivered change set uses existing filenames, keeps archived engineering evidence, and adds a status record and the requested audit, changelog, and decision register. The patch applies to the pinned documentation inputs. The verification covers document links and headings, chart and milestone identifiers, intended scope, and a docs-only path allowlist. The application code, dependency manifests and locks, migrations, and private data are outside the patch.

@@ -31,6 +31,8 @@
 
 ## 3. Shared chart-series contract
 
+The following registry is the original target. In the accepted `m1-v3` API, chart statuses are `not_run`, `ready`, `not_available`, and `failed`. `queued` and `running` describe analysis jobs or the asset's analysis state. Read fields and types from the shipped OpenAPI contract. See the [decision register](OPEN_DECISIONS_AND_UNCERTAINTIES.md) for remaining schema, unit, and presentation differences.
+
 A chart registry should expose: `chart_kind`, `status` (`ready|queued|running|not_available|failed`), `title`, `evidence_class`, `method_id`, `method_version`, `units`, `time_start_s`, `time_end_s`, `sample_rate`, `resolution`/`hop_size` where relevant, `axis_definitions`, `series`, `review_markers`, `caveats`, `data_url`, `png_url`, and `not_available_reason` where relevant. Numeric data points must be finite; sanitize silent/undefined correlations explicitly. For long files, decimate in the service with min/max-preserving waveform display buckets and document whether values are smoothed.
 
 Handle mono by showing waveform/levels/spectra and marking stereo charts N/A, not by silently inventing a right channel. Frequency ceilings must respect the sampling rate. For very short clips, omit windows that cannot be computed and explain why.

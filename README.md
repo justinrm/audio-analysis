@@ -1,6 +1,6 @@
 # Audio Reference Studio
 
-Audio Reference Studio is a local application for studying one recording at a time. It keeps the original WAV on this computer, measures it with a versioned method, and shows those measurements as interactive charts beside a shared playhead. An optional lyric file can sit on the same timeline so you can inspect phrasing, repetition, and structure without turning a measurement into a musical verdict.
+Audio Reference Studio is a local-first audio-analysis application. The current build supports single-recording studies. It keeps the original WAV on this computer, measures it with a versioned method, and shows those measurements as interactive charts beside a shared playhead. An optional lyric file can sit on the same timeline so you can inspect phrasing, repetition, and structure without turning a measurement into a musical verdict.
 
 Two uses have equal weight. Album QC is a planned third workspace and is not built yet.
 
@@ -24,10 +24,10 @@ What follows is what this tree does. Later sections name work that is only speci
 
 ### Import and storage
 
-- Accepted audio is 16-bit or 24-bit integer PCM WAV, including PCM extensible WAV with those valid bit depths. Float WAV and other formats are refused.
+- Accepted audio is 16-bit or 24-bit integer PCM WAV, including supported PCM extensible WAV with matching container and valid bit depths. Float WAV and other formats are refused.
 - The upload is hashed with SHA-256 while it streams. The stored master, `blobs/{sha256}`, is the original bytes. The display name is not a filesystem path.
 - The same bytes imported again reuse that master.
-- Studies and recordings persist in SQLite. The library screen opens the earliest study and lists its recordings.
+- Studies and recordings persist in SQLite. The library initially opens the earliest study. The study selector can reopen another study, and imports go to the selected study.
 - Default limits are 500 MiB and 900 seconds, both configurable.
 
 ### Playback and waveform
@@ -54,7 +54,7 @@ Analysis version is `m1-v3`. Requesting analysis returns HTTP 202 and queues a j
 | T09 | Within-file self-similarity | Estimated |
 | T10 | Ending level, subthreshold gaps, endpoint, and full-scale rail events | Measured. These are checkpoints, not a finding that a click or clip is audible. |
 
-Interactive charts are ECharts drawings of the stored chart document. Each ready chart also has a PNG rendered from that document. The browser does not compute loudness, spectra, or peaks.
+Interactive charts are ECharts drawings of the stored chart document. The worker renders a PNG from each ready chart document when rendering succeeds. A failed PNG render leaves the chart and its measurements available. The browser does not compute loudness, spectra, or peaks.
 
 ### Evidence
 
@@ -64,7 +64,7 @@ The technical panel shows the chart’s evidence class, method, `m1-v3` version,
 
 ### Lyrics workspace
 
-M2-A stores lyric files, parses them, and keeps revisions. M2-B is the workspace on that API. The owner accepted both slices on 2026-10-14. Milestone 2 as a whole is not accepted. See [Status](#status).
+The lyrics workspace uses revisioned storage and project-scoped recording membership. See [Project status](PROJECT_STATUS.md) for acceptance and QA.
 
 - `.txt`, `.md`, and `.srt` uploads, up to 1 MiB. The original lyric bytes are kept under `lyrics/{sha256}`.
 - Text and Markdown lines start `unplaced`. SRT cues that parse into a forward interval start as `subtitle_supplied`. Reversed, malformed, or out-of-range cues are kept and left off the time axis.
@@ -208,25 +208,7 @@ Offline analysis does not call a model. No narrative client is installed. Import
 
 ## Status
 
-Milestone 0, commit `e4f1223`, is the local studio: WAV import, playback, and charts left `not_run`.
-
-Milestone 1 is accepted at `a387bb2`. Analysis version is `m1-v3`. Charts T01–T10 are the accepted technical set. Preserve that measurement behavior.
-
-M2-A, commit `4d1e71b`, adds lyric storage, parsing, revisions, annotations, and evidence reads. `backend/tests/test_lyrics.py` covers that work. The owner accepted M2-A on 2026-10-14.
-
-M2-B, commit `d1f29a7`, is the lyrics workspace, covered by `frontend/src/lyrics.test.tsx`. The owner accepted M2-B on 2026-10-14.
-
-Milestone 2 as a whole is not accepted. M2-C is not accepted.
-
-That acceptance cites [docs/qa/m2a-m2b-2026-10-15.md](docs/qa/m2a-m2b-2026-10-15.md). Backend: Ruff passed; pytest 58 passed. Frontend: typecheck passed; Vitest 31 passed; build passed. Browser QA passed for tested lyric ingestion, editing, persistence, timing, annotations, conflict protection, concurrent reads, playback continuity, and restart behavior. No M2-A or M2-B functional defect was identified in the executed tests. The report's "Not tested" section lists scenarios this acceptance does not cover.
-
-Still ahead, and not started as product behavior:
-
-- M2-C, the five inspiration charts L01–L05 ([plan](docs/superpowers/plans/2026-10-13-milestone-2.md))
-- Milestone 3 export packages, and any optional narrative client
-- Milestone 4 Album QC
-
-The product contract is [docs/01_TECHNICAL_MVP_SPEC.md](docs/01_TECHNICAL_MVP_SPEC.md) and [docs/04_TECHNICAL_CHART_REQUIREMENTS.md](docs/04_TECHNICAL_CHART_REQUIREMENTS.md). Where an older note disagrees with the accepted Milestone 1 commit, the commit and the current code win.
+[PROJECT_STATUS.md](PROJECT_STATUS.md) owns implementation and acceptance status. [NEXT_SESSION.md](NEXT_SESSION.md) gives the current handoff and authorized scope. The [documentation index](docs/README.md) explains which documents own requirements and decisions.
 
 ## Further reading
 
@@ -235,5 +217,3 @@ The product contract is [docs/01_TECHNICAL_MVP_SPEC.md](docs/01_TECHNICAL_MVP_SP
 - [Milestone 2 plan](docs/superpowers/plans/2026-10-13-milestone-2.md) — lyric evidence, the workspace, and L01–L05
 - [Implementation audit](docs/album_observatory_followup_audit.md) — snapshot from before owner acceptance of M2-A and M2-B. It is not an acceptance decision.
 - [Local toolchain note](docs/ENVIRONMENT.md) — recovering a stalled Vite or Vitest run
-
-`docs/README.md` is the index to the requirements and the running app. `NEXT_SESSION.md` is the current handoff and does not accept a milestone. `docs/03_CURSOR_AGENT_FIRST_SESSION.md` is the historical Milestone 0 session.

@@ -2,19 +2,7 @@
 
 Approved direction for the frontend. A design pass is not a product milestone.
 
-| Workstream | Status |
-|---|---|
-| Milestone 0 | Accepted at `e4f1223` |
-| Milestone 1 | Accepted at `a387bb2` |
-| M2-A | Accepted by the owner on 2026-10-14 at `4d1e71b` |
-| M2-B | Accepted by the owner on 2026-10-14 at `d1f29a7` |
-| Studio Precision Pass 1 | Accepted by the owner on 2026-11-06 |
-| Studio Precision Pass 2 | Accepted by the owner on 2026-11-06 |
-| Studio Precision Pass 3 | Not started and not authorized |
-| M2-C | Not authorized |
-| Milestone 2 overall | Not accepted |
-
-Milestone 0, Milestone 1, M2-A, and M2-B stay on the records in `.cursor/rules/project.mdc`. Accepting Pass 2 does not accept Milestone 2 or M2-C.
+For the accepted checkpoint sequence, verification history, and current phase, see [Project status](../../PROJECT_STATUS.md). The [Pass 3 readiness report](studio-precision-pass3.md) is a separate proposal.
 
 ## Pass 2 acceptance
 
@@ -62,7 +50,7 @@ The production build emits one main JavaScript chunk of 1,460.36 kB. Vite warns 
 
 Pass 2 does not close every frontend presentation issue.
 
-**Pass 3 candidates.** Not started and not authorized.
+**Pass 3 candidates at the Pass 2 checkpoint.** See the linked readiness proposal for the later assessment.
 
 - T01 legend density and overlap at narrow widths.
 - T04 spectrogram axis labels and frequency-tick presentation.

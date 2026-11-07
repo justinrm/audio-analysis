@@ -5,15 +5,23 @@ alwaysApply: true
 
 # Audio Reference Studio
 
-Follow `docs/01_TECHNICAL_MVP_SPEC.md` and `docs/04_TECHNICAL_CHART_REQUIREMENTS.md`. Do not paste them into code or into these rules.
+Start at `docs/README.md`. Follow the product and chart contracts in `docs/01_TECHNICAL_MVP_SPEC.md` and `docs/04_TECHNICAL_CHART_REQUIREMENTS.md`. Consult `docs/OPEN_DECISIONS_AND_UNCERTAINTIES.md` for locked decisions and tracked discrepancies. Implementation differences require evaluation against the approved contract.
 
-`docs/03_CURSOR_AGENT_FIRST_SESSION.md` is the historical Milestone 0 session. `NEXT_SESSION.md` is the current handoff. Neither file accepts a milestone.
+`PROJECT_STATUS.md` owns checkpoint acceptance and verification. `NEXT_SESSION.md` owns the current handoff and work boundary. Check both before changing files. Only the owner can accept a checkpoint or authorize a new implementation scope. Historical prompts, passing tests, and proposals confer no authorization.
 
-## Milestones
+## Documentation and milestone continuity
 
-Milestone 0 is `e4f1223`: WAV import, playback, and charts left `not_run`. Milestone 1 is accepted at `a387bb2`: analysis version `m1-v3` and charts T01–T10. Preserve that implementation. M2-A is accepted by the owner on 2026-10-14 at `4d1e71b`. M2-B is accepted by the owner on 2026-10-14 at `d1f29a7`. Milestone 2 as a whole is not accepted. M2-C is not accepted. Do not start M2-C, ZIP export, album comparison, or a narrative client unless the user asks.
+Following an explicit owner acceptance or scope decision, reconcile `PROJECT_STATUS.md`, `NEXT_SESSION.md`, and any affected decision records before beginning subsequent implementation.
 
-The M2-A and M2-B acceptance cites `docs/qa/m2a-m2b-2026-10-15.md`. Backend: Ruff passed; pytest 58 passed. Frontend: typecheck passed; Vitest 31 passed; build passed. Browser QA passed for the lyric ingestion, editing, persistence, timing, annotations, conflict protection, concurrent reads, playback continuity, and restart behavior that report executed. No M2-A or M2-B functional defect was identified in those executed tests. The report's "Not tested" section lists scenarios this acceptance does not cover.
+Record the accepted or authorized scope, supporting commit or source reference, verification evidence, remaining limitations, and next permitted action.
+
+`PROJECT_STATUS.md` is the authority for implementation and acceptance status. `NEXT_SESSION.md` is the current development handoff. Approved specifications remain authoritative for requirements. Do not duplicate full milestone histories across Cursor rules.
+
+Passing tests, completing code, creating commits, or an agent reporting success does not constitute owner acceptance.
+
+Never infer authorization for the next milestone. When acceptance or scope is ambiguous, report the uncertainty and retain the previous approved boundary.
+
+Documentation changes must preserve historical evidence and distinguish verified implementation, reported results, accepted decisions, proposals, and unknowns.
 
 ## Architecture
 
@@ -41,4 +49,4 @@ From `frontend/`: `pnpm typecheck && pnpm test && pnpm build`
 
 ## Local tools
 
-Git remote `origin` is GitHub. Local `main` may be ahead of `origin/main`. Cursor Origin does not see a GitHub remote; use git for this repository. Use Graphify only when `graphify-out/` exists. Playwright can set a file input; the Cursor browser cannot.
+Verify local HEAD, branch, upstream and worktree with Git. Preserve unrelated work and obtain explicit owner authorization before committing, pushing or merging. Use Graphify only when `graphify-out/` exists. The recorded lyric QA used Playwright to set file inputs.

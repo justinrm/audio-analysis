@@ -1,58 +1,22 @@
 # Next session
 
-Milestone 1 is accepted at `a387bb2`. Analysis version is `m1-v3`. Charts T01–T10 stay on that measurement. Do not change it.
+## Start here
 
-M2-A is accepted by the owner on 2026-10-14 at `4d1e71b`. M2-B, the lyrics workspace, is accepted by the owner on 2026-10-14 at `d1f29a7`. That acceptance is recorded in `.cursor/rules/project.mdc`. Milestone 2 as a whole is not accepted. Do not start M2-C, ZIP export, album comparison, or a narrative client unless asked. Do not build the T02 stored-sample inspector unless asked.
+Read [PROJECT_STATUS.md](PROJECT_STATUS.md) for the accepted baseline, latest published revision, reported test results, and verification limits. Use the [documentation index](docs/README.md) for the approved requirements. The latest accepted implementation checkpoint recorded on GitHub is Pass 2. The published head after it contains the [Pass 3 readiness proposal](docs/design/studio-precision-pass3.md).
 
-## What is in place
+The audited GitHub branch is `main` at `260cb677`. That audit recorded the local Cursor branch, HEAD, upstream divergence, and worktree contents as unknown. This audit executed documentation checks only. [Verification history](PROJECT_STATUS.md#verification-history) separates prior recorded test runs from this audit's checks. See [Open items](PROJECT_STATUS.md#open-items) for the separate bundle, playback, assetless Analyzer, and contract issues.
 
-- WAV import keeps the original bytes at `blobs/{sha256}`. Playback uses that blob for 16-bit PCM and `derivatives/{sha256}/pcm_s16le-triangular-v1.wav` for 24-bit PCM.
-- `POST /api/assets/{id}/analyze` returns 202. `python -m app.worker` runs the job. A completed `m1-v3` run with `metrics.json` is reused.
-- T01–T05 and T10 are measured when they apply. Mono T05 is `not_available` with evidence class `not_applicable`. T06–T09 stay estimated.
-- Lyric `.txt`, `.md`, and `.srt` files are stored, edited, timed by hand, and drawn as waveform regions when the interval is usable. SRT times are the subtitle file’s times. A stale revision returns 409 and does not overwrite the newer text.
-- Notes are annotations. Lyric edits do not rewrite `analysis/{sha256}/m1-v3/`.
-- L01–L05 are not implemented. Album QC is an empty state. Settings leave AI interpretation off.
-- Studio Precision Pass 1 (shell, language, and library) is accepted by the owner on 2026-11-06. Pass 2 (persistent transport, chart workspace, one lyric editor) is accepted by the owner on 2026-11-06. Pass 3 is not started and is not authorized. The width rule and the Pass 2 record are in `docs/design/studio-precision.md`.
+Before the documentation patch was applied, local `main` was clean and synchronized with `origin/main` at `260cb677`. HEAD remains `260cb677`. The reconciliation is staged in the worktree and is not committed. That verification does not rewrite the audit and does not authorize Pass 3, M2-C, or a later milestone.
 
-## Next
+## Cursor handoff
 
-Plan Studio Precision Pass 3: technical-chart presentation only. Do not implement it, change `m1-v3`, or start M2-C unless the owner asks. Pass 3 candidates and the separate bundle, playback, and empty-analyzer notes are listed in `docs/design/studio-precision.md`.
+1. Run `git status --short --branch`, `git rev-parse HEAD`, and `git log -5 --oneline --decorate` in the local checkout. If an upstream is configured, compare local HEAD with it. Inspect staged and unstaged diffs and report relevant untracked paths. Preserve unrelated work.
+2. Review the [Pass 3 proposal](docs/design/studio-precision-pass3.md) against the [technical chart contract](docs/04_TECHNICAL_CHART_REQUIREMENTS.md), especially units, accessible chart alternatives, and browser/PNG presentation consistency. Bring any requested exception to the owner with the specific affected chart and acceptance criterion.
+3. Return a concise report identifying the local SHA, any drift from the published baseline, acceptance records available locally, exactly which checks were run or merely reported, and the owner decision needed. If a newer local implementation is present without explicit acceptance, review that work for acceptance first. Keep the published Pass 2 record intact.
+4. Stop for the owner decision. The authorized work in this handoff is inspection, reconciliation, and proposal review. Owner approval of a later implementation scope must be explicit.
 
-## Commands
+Protect `m1-v3`, T01–T10 stored data and methods, the original WAV bytes, waveform/transport continuity, lyric draft and revision semantics, evidence labels, and the independent use of each workspace. Pass 3 implementation, M2-C/L01–L05, ZIP exports, narrative integration, Album QC/T11, the T02 stored-sample inspector, unrelated debt fixes, and Git commits/pushes/merges require separate authorization.
 
-From `backend/`, in two terminals:
+## If the owner requests a baseline reproduction
 
-```bash
-uv run uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
-uv run python -m app.worker
-```
-
-From `frontend/`:
-
-```bash
-pnpm dev
-```
-
-Open `http://127.0.0.1:5173/`. Without the worker, a new analysis stays `queued`.
-
-`ARS_DATA_ROOT` is the API storage directory. Unset or empty uses `~/Library/Application Support/AudioReferenceStudio`. `ARS_API_ORIGIN` is only the Vite dev proxy for `/api`, read from the shell when `frontend/vite.config.ts` loads. Default `http://127.0.0.1:8000`.
-
-## Checks last run
-
-6 Nov 2026, Pass 2 checkpoint, from `frontend/`:
-
-- `pnpm typecheck` passed.
-- `pnpm test`: 5 files, 40 tests passed.
-- `pnpm build` passed. The main JS chunk is 1,460.36 kB. Vite warned that it is over 500 kB. That warning is not a Pass 2 failure.
-- Backend tests were not rerun. No backend source files changed.
-- The owner’s browser review passed playback continuity, lyric draft retention, hidden-workspace keyboard exclusion, responsive layout, and annotations, with no console errors or failed requests in the final reported check. The final refinement did not rerun every earlier browser scenario. This handoff does not itself accept Milestone 2.
-
-14 Oct 2026, on this working tree:
-
-- `backend/`: `uv run ruff check .` passed. `uv run pytest -q`: 58 passed. One Starlette warning: `httpx` with `starlette.testclient` is deprecated.
-- `frontend/`: `pnpm typecheck` passed. `pnpm test`: 4 files, 31 tests passed. `pnpm build` passed. The main JS chunk is about 1.45 MB, and Vite warned that it is over 500 kB.
-- Browser QA in [docs/qa/m2a-m2b-2026-10-15.md](docs/qa/m2a-m2b-2026-10-15.md) (2026-10-15 UTC) passed for the lyric ingestion, editing, persistence, timing, annotations, conflict protection, concurrent reads, playback continuity, and restart behavior it executed. No M2-A or M2-B functional defect was identified in those executed tests. That record's "Not tested" section was not run. Owner acceptance on 2026-10-14 cites it. This handoff does not itself accept a milestone.
-
-## Not claimed
-
-Tempo, pitch-class, structure, and recurrence are estimates. A loudness, peak, or correlation figure is not a judgment that something is audible. Subtitle cues are not sung-word alignment. Chart zoom shared with the waveform is not implemented.
+Use the [local startup and check commands](README.md#install-and-run) and the test sections in [Project status](PROJECT_STATUS.md#verification-history). Record SHA, environment, command, result, warnings, and scenarios skipped. For a browser baseline, record playback across workspace and chart changes, one waveform instance, draft retention, hidden-workspace keyboard exclusion, notes, and widths 1440, 1280, 1000 and 390 pixels. Use synthetic or owner-approved local recordings. Inspect playback and annotations without modifying masters or the analysis cache. A passing check supplies evidence for review.

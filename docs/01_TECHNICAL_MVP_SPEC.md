@@ -1,9 +1,10 @@
 # Audio Reference Studio — Technical MVP Specification
 
-**Status:** Revised proposed v0.1 implementation baseline; technical diagnostics and lyricist references are equally first-class; not an existing implementation  
+**Role:** v0.1 product and architecture requirements. Technical diagnostics and lyricist references have equal priority. See [Project status](../PROJECT_STATUS.md) for implementation and acceptance and the [decision register](OPEN_DECISIONS_AND_UNCERTAINTIES.md) for approved clarifications and open discrepancies.
+
 **Prepared:** 2026-10-12  
 **Ownership:** Local, single-user, human-in-the-loop. Cursor is the implementation environment.  
-**Source authority:** User-provided four-song audit scripts/data and five-chart `Praise Kink` reference. Protect source audio and preserve evidence/uncertainty distinctions.
+**Design references:** User-provided four-song audit scripts/data and five-chart `Praise Kink` reference. See the [documentation index](README.md) for authority. Protect source audio and preserve evidence/uncertainty distinctions.
 
 ## 1. Product and product boundaries
 
@@ -26,12 +27,12 @@ Compare multiple recordings' objective metrics and generate focused human listen
 ### Success condition
 One person can import a WAV **without lyrics**, inspect an interactive technical analysis dashboard, and export a reproducible **Technical Analysis Package** (diagnostic PNGs + metrics/data + methodology). With optional lyrics, they can also explore synchronization and export the **five-chart Lyricist Reference Package**. They can select **Technical**, **Lyricist**, or **Combined** exports and can compare multiple songs in Album QC. All baseline features work offline with NIM disabled.
 
-## 2. Recommended stack — deliberately selected
+## 2. Technology foundation
 
 | Layer | Choice | Rationale |
 |---|---|---|
 | Frontend | **React + TypeScript + Vite** | Real web-app separation; can later deploy UI independently of the analysis API |
-| UI | Tailwind CSS + shadcn/ui primitives; Lucide icons | Accessible components with restrained, polished styling |
+| UI | Tailwind CSS, Lucide, and targeted accessible components | Accessible components with restrained, polished styling |
 | Playback | wavesurfer.js; backend-generated waveform peaks when necessary | Seeking, regions, cursor, time ruler and selected-range audition |
 | Analysis graphs | Apache ECharts | Linked time cursors, zoom, repetition heatmaps, timelined annotations |
 | API | **FastAPI + Pydantic** | Typed contracts, file upload endpoints and generated OpenAPI schemas |
@@ -41,7 +42,7 @@ One person can import a WAV **without lyrics**, inspect an interactive technical
 | Package visuals | Matplotlib (headless) | PNG generation independent of a browser, reproducible |
 | Persistence | SQLite + filesystem content-addressed blobs | Local, easy backup, avoids databases/services initially |
 | Reports | Markdown templates + optional local text LLM | Deterministic fallback, citation to evidence IDs |
-| Optional model | Provider adapter for **NVIDIA NIM** OpenAI-compatible chat completion | Text-only interpretation when enabled and supported |
+| Optional model | Provider-neutral adapter. **NVIDIA NIM** is an OpenAI-compatible candidate. | Text-only interpretation when enabled and supported |
 | Tooling | uv or venv + pytest + ruff; npm/pnpm + Vitest + React Testing Library + Playwright | Repeatable local development and validation |
 
 Support macOS Apple Silicon and Python 3.12 as initial target; pin dependency versions during implementation, then verify actual wheel availability on the developer's Mac. Use no local CUDA requirement.
@@ -118,14 +119,14 @@ A technical export contains all **available core chart types** as individually l
 4. **Repetition map** — timbral/pitch-class feature similarity plus repeated textual patterns on separate axes. No conclusion that matching spectral patterns prove identical melodies.
 5. **Musical DNA and transferable principles** — visual evidence summary with measured / estimated / textual / interpretive / unknown badges, citations to timestamp or line IDs; original reference mechanisms, no copied hook or lyrical identity.
 
-**Important separation:** mastering metrics, spectral distribution, stereo evolution, and pulse/tonality estimates are first-class **technical** views, not merely optional QC charts. The Lyricist charts selectively reuse their evidence and add textual context; they must not replace the complete technical visualizations. Both interactive and exported charts derive from the same canonical analysis data.
+**Important separation:** mastering metrics, spectral distribution, stereo evolution, and pulse/tonality estimates are first-class **technical** views, not merely optional QC charts. The Lyricist charts selectively reuse their evidence and add textual context; they must not replace the complete technical visualizations. Interactive charts, static visuals, written evidence, and Album QC derive from the same canonical evidence pipeline. Each workspace uses the evidence it needs independently.
 
 ## 5. Backend pipeline
 
 **Ingest → Validate → Analyze → Normalize Evidence → (Optional Align/Annotate) → Generate Text → Render Charts → Export**
 
 - **Ingest:** accept one or more WAVs, optional text/subtitle companion. Save uploaded bytes to managed local area; compute SHA-256 while streaming, do not `read_bytes()` entire large files merely to hash.
-- **Validate:** probe codec/PCM subtype, duration, sample rate, channels, bit depth; refuse corrupted/unreasonably large inputs. Support integer PCM 16/24/32 and 32-bit float WAV; correctly scale or reject unsupported formats. Mono is allowed; stereo-specific metrics become `not_applicable`.
+- **Validate:** probe codec/PCM subtype, duration, sample rate, channels, bit depth; refuse corrupted/unreasonably large inputs. The accepted baseline supports 16/24-bit integer PCM WAV. The original v0.1 target also lists integer PCM 32 and 32-bit float WAV. Those subtypes require a separately authorized scope decision and validated scaling before support is claimed. Mono is allowed. Stereo-specific metrics become `not_applicable`.
 - **Decode:** control memory with blocks or chunking; preserve original sample rate for time-domain measurements; resample *analysis copies only* for onset/chroma. Never alter imported masters.
 - **Measure:** standardized FFmpeg EBU R128 metrics; independent oversampled peak cross-check; RMS, spectral bands, stereo features, silence regions, rhythmic pulse candidates and provisional novelty/recurrence descriptors.
 - **Normalize:** produce typed evidence records with time ranges, source, method identifier/version, value/unit, evidence class, confidence and constraints.
@@ -133,7 +134,7 @@ A technical export contains all **available core chart types** as individually l
 - **Render/export:** a canonical per-asset metric/time-series/feature dataset feeds ECharts browser views and Matplotlib PNGs; generate `technical/`, `lyricist/`, or both in ZIP. Markdown templates and manifests contain hashes, methods, generated-at, timing provenance, and unavailable-feature explanations. Atomic write to temp dir then rename to completed export.
 
 ### Technical guardrails
-- Explicit `measured`, `estimated`, `textual`, `interpretive`, `unknown`; *quality* is not derived from a number.
+- Use `measured`, `estimated`, `textual`, `interpretive`, `unknown`, and `not_applicable` for evidence. Record human listening assessments as separately attributed annotations. Keep evidence class, availability/status, and confidence distinct.
 - Distinguish raw sample peaks (dBFS) from reconstructed true peak (dBTP), and RMS from loudness.
 - Fixed DSP defaults documented and versioned; record effective sample rate/hop/window/filter and time coordinate units.
 - Bound computation time/memory on long audio; return helpful failure messages for decoding, subprocess and model errors.
@@ -174,6 +175,8 @@ Add SQLite migrations early; keep asset IDs and UI URLs independent of filesyste
 
 ## 7. Local REST API (v0.1)
 
+The following is the v0.1 target. Current route names and response shapes are defined by the shipped OpenAPI schema. Tracked route and contract gaps are listed in the [decision register](OPEN_DECISIONS_AND_UNCERTAINTIES.md).
+
 - `GET /api/health` — dependency and database status.
 - `GET /api/projects`, `POST /api/projects`, `GET /api/projects/{id}`, `DELETE /api/projects/{id}`.
 - `POST /api/projects/{id}/assets` — streamed WAV upload; returns asset and existing-cache status.
@@ -195,7 +198,7 @@ Use finite / bounded chart arrays; return summarized/downsampled waveform peaks 
 - Worker: separate process from API, **one audio job at a time** initially; persist status to SQLite (`queued`, `running`, `completed`, `failed`, `canceled`). On crash or restart, mark abandoned `running` as interrupted and allow retry.
 - Avoid CPU-heavy work in FastAPI's ordinary request handlers/short `BackgroundTasks`; no Redis/Celery for one user.
 - Default local data root e.g. `~/Library/Application Support/AudioReferenceStudio/`; project folders use UUIDs and SHA prefixes, never user-supplied filenames as trusted paths.
-- Limits: configurable WAV size cap (initial default 500 MB), max length (initial 15 min per reference), analysis timeouts, bounded workers and parallel process threads.
+- Limits: configurable WAV size cap (current default 500 MiB, or 524,288,000 bytes), max length (initial 15 min per reference), analysis timeouts, bounded workers and parallel process threads.
 - File hashes: streaming SHA-256. Store originals untouched; chart temp files removed after success/failure.
 - Environment variables for provider endpoint/key; keys never sent to browser, logged, saved in exports or committed to repository.
 - No public network binding, automatic telemetry or remote access by default. No login needed only because server is local; revisit auth before public access.
@@ -257,6 +260,8 @@ Provider-neutral interface: `NarrativeProvider.generate(evidence_bundle, output_
 **Scientific validity:** Mark algorithms as `validated`, `experimental` or `not evaluated`; do not claim recognition of exact chords, singer identity, live instruments or 'emotional arc' from power metrics alone.
 
 ## 12. Explicit future extension seams, not MVP commitments
+
+Public distribution, downloadable desktop packaging, and SaaS remain future options. Rust DSP and Tauri packaging require separate decisions and validation. The local stack above remains the approved foundation.
 
 - Source separation, audio text/ML perceptual models, forced alignment for singing, beat-grid extraction, and waveform stem comparison are plugin-like modules with their own evaluation gates.
 - Multi-user auth, per-user storage, entitlement checks, rate limiting, deployment worker queue and licensing rights checks before publishing.

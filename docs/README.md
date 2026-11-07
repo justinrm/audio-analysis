@@ -1,20 +1,26 @@
-# Audio Reference Studio
+# Audio Reference Studio documentation
 
-Audio Reference Studio is a local application for one recording at a time. Setup, current behavior, and milestone status are in the root [README](../README.md).
+The root [README](../README.md) describes the published application and how to run it. Use this index to find the owner of each kind of information.
 
-## Requirements
+| Subject | Canonical document | Scope |
+| --- | --- | --- |
+| Product and architecture requirements | [Technical MVP specification](01_TECHNICAL_MVP_SPEC.md) | Three workspaces, offline operation, source preservation, local stack, and milestone gates |
+| Technical and scientific chart contracts | [Technical chart requirements](04_TECHNICAL_CHART_REQUIREMENTS.md) | T01–T11, units, evidence, rendering and validation. The MVP specification §4B and the linked M2 plan define L01–L05. |
+| Current implementation, acceptance and test status | [PROJECT_STATUS.md](../PROJECT_STATUS.md) | Current record with dated source and approval evidence |
+| Locked decisions and unresolved discrepancies | [Decision and uncertainty register](OPEN_DECISIONS_AND_UNCERTAINTIES.md) | Decision index with authority links, gaps, and proposals requiring owner review |
+| Current handoff and authorized work | [NEXT_SESSION.md](../NEXT_SESSION.md) | First action, limits, and verification expectations |
 
-These documents are the product contract. Sections that describe L01–L05, ZIP export, an optional narrative, and Album QC are still requirements. They are not a description of what the application does today.
+Apply authority in this order: the latest explicit owner decision, accepted milestone records and approved decisions, current requirements, verified implementation and test evidence, historical engineering references, then exploratory material. Code establishes observed behavior. A difference from an approved requirement goes in the decision register for evaluation. Acceptance and authorization are recorded separately.
 
-1. [Technical MVP specification](01_TECHNICAL_MVP_SPEC.md) — product boundaries, screens, data, API, and milestone gates.
-2. [Technical chart requirements](04_TECHNICAL_CHART_REQUIREMENTS.md) — T01–T11, evidence labels, and validation intent.
-3. [Milestone 2 plan](superpowers/plans/2026-10-13-milestone-2.md) — lyric evidence, the workspace, and the five inspiration charts.
+## Supporting records
 
-## Historical notes
+- [Milestone 2 plan](superpowers/plans/2026-10-13-milestone-2.md) — lyric evidence and L01–L05 design. Task order and checkboxes are historical planning.
+- [M2-A/M2-B QA](qa/m2a-m2b-2026-10-15.md) — dated QA observations, scope limitations, and citation to the original acceptance record.
+- [Studio Precision](design/studio-precision.md) — accepted Pass 2 design and verification record. [Pass 3 readiness](design/studio-precision-pass3.md) is a proposal.
+- [Local toolchain](ENVIRONMENT.md) — recovery notes for a stalled frontend check.
 
-1. [Script review](02_SCRIPT_REVIEW.md) — review of the legacy audit scripts that informed the measurements.
-2. [Milestone 0 session](03_CURSOR_AGENT_FIRST_SESSION.md) — the first implementation session. It does not accept a later milestone.
+## Historical references
 
-## Where the work stands
-
-Milestone 1 is accepted at `a387bb2`: analysis version `m1-v3` and charts T01–T10. M2-A and M2-B are accepted by the owner on 2026-10-14. Milestone 2 as a whole is not accepted. M2-C is not accepted. Album QC is an empty screen. The current handoff is [NEXT_SESSION.md](../NEXT_SESSION.md). A stalled frontend check is covered in [ENVIRONMENT.md](ENVIRONMENT.md). Acceptance evidence is [qa/m2a-m2b-2026-10-15.md](qa/m2a-m2b-2026-10-15.md).
+- [Legacy script review](02_SCRIPT_REVIEW.md) — methods, historical decoder issue and validation caveats.
+- [Milestone 0 first-session prompt](03_CURSOR_AGENT_FIRST_SESSION.md) — original bounded-session draft, superseded as a work instruction.
+- [Album Observatory reference review](album_observatory_reference_review.md) and [follow-up audit](album_observatory_followup_audit.md) — evaluation snapshots and proposals from before the M2-A/M2-B acceptance record.

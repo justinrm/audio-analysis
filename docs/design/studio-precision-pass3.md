@@ -1,6 +1,6 @@
 # Studio Precision Pass 3 — readiness report
 
-Proposal only. The owner has not authorized implementation. Pass 3 does not accept Milestone 2, M2-C, or a change to analysis version `m1-v3`.
+Proposal only. See [NEXT_SESSION.md](../../NEXT_SESSION.md) for the current authorization boundary. This report supplies no approval to implement Pass 3, start M2-C, or change analysis version `m1-v3`.
 
 This report audits the chart renderer in `frontend/src/chart.tsx`, the workspace in `frontend/src/analyzer.tsx` and `frontend/src/styles.css`, the chart documents built by `backend/app/charts.py`, and two existing local `m1-v3` chart documents. One document set is a long stereo file with Nyquist at 24 kHz. The other is a short stereo file with Nyquist at 4 kHz. No private audio, titles, or lyric text are included. This session did not retake screenshots.
 
@@ -31,7 +31,7 @@ Pass 3 should stay inside Studio Precision: graphite, slate, and brass used with
 
 ## 2. Chart-by-chart findings
 
-Severity here means what Pass 3 needs for acceptance. “Essential” is required. “Optional” can wait.
+Severity here means what Pass 3 needs for acceptance. “Essential” and “Optional” are proposed acceptance priorities.
 
 ### T01 — Waveform and peak envelope
 
@@ -358,7 +358,7 @@ Do not change:
 - T09 linked x/y zoom
 - T10’s exclusion from the file-time playhead
 
-PNG export will not match a log T03 or a visible T04 scale after this pass, because `png.py` is unchanged and current documents say `y_scale: linear`. That divergence is accepted for Pass 3. An export pass is separate.
+PNG export will not match a log T03 or a visible T04 scale after this pass, because `png.py` is unchanged and current documents say `y_scale: linear`. A temporary presentation difference is proposed for Pass 3 and requires an explicit owner decision. The shared evidence and export consistency requirements still apply. See the [decision register](../OPEN_DECISIONS_AND_UNCERTAINTIES.md).
 
 Chart rebuilds today happen when the `chart` object changes, which is a new document, not a playhead tick. Keep it that way. T01 still embeds the 4000-point detail series while the overview is selected. Leave that data in the option. T04’s 96×180 heatmap is about 17k cells and is fine.
 
@@ -416,7 +416,7 @@ Out of Pass 3:
 Separate debt, not this pass:
 
 - The 1.46 MB chunk and the Vite warning. Address later with a lazy analyzer route if the first-load cost matters.
-- Playback unavailable on one previously observed recording. That is a playback-status bug, not a chart skin.
+- Playback unavailable on one previously observed recording. The cause and current reproducibility are unverified. Playback investigation is outside this proposal.
 - Analyzer with no asset. `App` sends the Analyzer nav button to `/analyzer` when no recording is open, and that route only says to choose one from the library.
 
 ## 10. Recommended order
@@ -428,4 +428,4 @@ Separate debt, not this pass:
 5. Unit D against the full matrix.
 6. Owner reviews the screenshots. A passing suite does not close the pass.
 
-Pass 2 remains the accepted checkpoint. This document does not implement Pass 3 and does not change milestone records.
+See [Project status](../../PROJECT_STATUS.md) for accepted checkpoints and [NEXT_SESSION.md](../../NEXT_SESSION.md) for the continuation gate.
