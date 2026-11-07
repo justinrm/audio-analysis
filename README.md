@@ -12,7 +12,7 @@ Import a WAV with no lyrics and no account. The analyzer plays the file, draws a
 
 Attach a `.txt`, `.md`, or `.srt` file to a recording in a study. Plain text and Markdown stay untimed until you place them. SRT cues keep the times written in the subtitle file. You can edit text, drag waveform regions, confirm an alignment, and leave notes. The same transport serves the technical charts and the lyric list.
 
-Inspiration charts L01–L05 are specified and not implemented. The lyric panel says so.
+Inspiration charts L01–L05 read the current lyric document and stored `m1-v3` measurements. They do not remeasure the WAV. L01 is the unified timeline, L02 written phrasing and density, L03 energy and dynamic contrast, L04 spectral and textual repetition, and L05 evidence-cited musical DNA and transferable principles. Those charts have no PNG or export package in this build.
 
 ## Album QC
 
@@ -72,11 +72,12 @@ The lyrics workspace uses revisioned storage and project-scoped recording member
 - A save sends the revision it was based on. If another revision landed first, the API returns 409 `stale_revision` and does not overwrite it. The workspace reloads the saved lines and keeps the unsaved edit so it can be written onto the newer revision.
 - Notes are timed annotations. The panel calls them artist observations, not measured evidence and not an Album QC verdict.
 - Lyric edits do not rewrite the `m1-v3` analysis cache.
-- The panel states that sung timing is not guessed and that inspiration charts are not in this slice.
+- The panel states that sung timing is not guessed.
+- L01–L05 are drawn from the current lyric document and stored technical charts. Saving lyrics does not rewrite `m1-v3`.
 
 ## Not in this build
 
-- L01–L05 musical-inspiration charts
+- Lyricist PNG packages
 - Technical, lyricist, or combined ZIP export
 - An optional narrative or other model client
 - Album comparison and T11

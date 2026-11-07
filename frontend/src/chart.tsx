@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react"
 import * as echarts from "echarts"
-import type { ChartDocument, ChartLine, ReviewMarker } from "./api/types"
+import type { ChartDocument, ChartLine, LyricRegion, ReviewMarker } from "./api/types"
 import { evidenceLabel } from "./catalog"
 import {
   AXIS_TITLE,
@@ -53,12 +53,14 @@ type LineGroup = {
 const TICK = { color: SERIES_INK, fontSize: 11, hideOverlap: true }
 const NAME = { color: AXIS_TITLE, fontSize: 12 }
 
+type PlotDocument = ChartDocument & { regions?: LyricRegion[] }
+
 export function ChartView({
   chart,
   onSeek,
   playhead = null,
 }: {
-  chart: ChartDocument
+  chart: PlotDocument
   onSeek: (seconds: number) => void
   playhead?: number | null
 }) {
@@ -158,7 +160,14 @@ export function ChartView({
   const lines = chart.series.lines?.length ?? 0
   const bars = chart.series.bars?.length ?? 0
   const heat = (chart.series.heatmap?.z.length ?? 0) > 0
-  const stacked = (lines > 0 && (bars > 0 || heat)) || splitsLevels(chart) || heat || chart.chart_kind === "T02" || chart.chart_kind === "T05"
+  const stacked =
+    (lines > 0 && (bars > 0 || heat)) ||
+    splitsLevels(chart) ||
+    heat ||
+    chart.chart_kind === "T02" ||
+    chart.chart_kind === "T05" ||
+    chart.chart_kind === "L03"
+  const regions = chart.regions ?? []
   const describedBy = `${chart.chart_kind}-desc`
   return (
     <>
@@ -190,6 +199,17 @@ export function ChartView({
           ))}
         </ul>
       ) : null}
+      {regions.length > 0 ? (
+        <ul className="markers">
+          {regions.map((region) => (
+            <li key={region.evidence_id}>
+              <button type="button" onClick={() => onSeek(region.start_s)}>
+                {region.label} {formatFileTime(region.start_s, true)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <ChartDataTable chart={chart} />
     </>
   )
@@ -212,7 +232,7 @@ function timeOf(chart: ChartDocument, raw: unknown): number | null {
   return index
 }
 
-function optionFor(chart: ChartDocument, playhead: number | null, plotWidth: number): BuiltChart {
+function optionFor(chart: PlotDocument, playhead: number | null, plotWidth: number): BuiltChart {
   const lines = chart.series.lines ?? []
   const bars = chart.series.bars ?? []
   const heat = chart.series.heatmap
@@ -369,7 +389,7 @@ function lineGroups(chart: ChartDocument): LineGroup[] {
       { lines: lines.filter((line) => line.unit === "dB"), yName: "Side/mid (dB)" },
     ].filter((group) => group.lines.length > 0)
   }
-  if (chart.chart_kind === "T02") {
+  if (chart.chart_kind === "T02" || chart.chart_kind === "L03") {
     const dbfs = lines.filter((line) => line.unit === "dBFS")
     const lufs = lines.filter((line) => line.unit === "LUFS")
     const rest = lines.filter((line) => line.unit !== "dBFS" && line.unit !== "LUFS")
@@ -470,7 +490,7 @@ function splitsLevels(chart: ChartDocument): boolean {
 }
 
 function pushLines(
-  chart: ChartDocument,
+  chart: PlotDocument,
   grids: echarts.GridComponentOption[],
   xAxis: echarts.XAXisComponentOption[],
   yAxis: echarts.YAXisComponentOption[],
@@ -520,7 +540,7 @@ function pushLines(
     nameLocation: "middle",
     nameGap: 64,
     nameTextStyle: NAME,
-    scale: chart.chart_kind === "T02" || undefined,
+    scale: chart.chart_kind === "T02" || chart.chart_kind === "L03" || undefined,
     min: group.yMin,
     max: group.yMax,
     axisLabel: {
@@ -531,6 +551,7 @@ function pushLines(
   })
   remember(playheads, index, index, xName, group.yName)
   const layer = markerLayer(chart)
+  const areas = regionAreas(chart)
   group.lines.forEach((line, lineIndex) => {
     const item = lineSeries(
       chart,
@@ -542,8 +563,26 @@ function pushLines(
     if (lineIndex === 0 && layer) {
       item.markLine = layer
     }
+    if (lineIndex === 0 && areas) {
+      item.markArea = areas
+    }
     series.push(item)
   })
+}
+
+function regionAreas(chart: PlotDocument): echarts.MarkAreaComponentOption | undefined {
+  const regions = chart.regions ?? []
+  if (regions.length === 0 || !fileTime(chart.axis_definitions.x)) {
+    return undefined
+  }
+  return {
+    silent: true,
+    itemStyle: { color: "rgba(196, 163, 106, 0.28)" },
+    data: regions.map((region) => [
+      { xAxis: region.start_s, name: region.label },
+      { xAxis: region.end_s },
+    ]),
+  }
 }
 
 function lineSeries(

@@ -14,7 +14,7 @@ React 19 and TypeScript. Product contract: `docs/01_TECHNICAL_MVP_SPEC.md` and `
 - T03 is the presentation exception. Stored `y_scale` stays `linear` and the Welch unit stays `dB`. The browser and the PNG renderer show the existing positive-Hz samples on a logarithmic frequency axis. That display adds no spectral samples and does not relabel the unit as dB/Hz. Frequency interaction does not seek.
 - Show chart `status` (`not_run`, `ready`, `not_available`, `failed`) as that status. Show `evidence_class` separately. Do not turn one into the other.
 - Import API shapes from generated OpenAPI types in `frontend/src/api/`. Do not hand-maintain a second copy.
-- The lyrics workspace edits an attached TXT, Markdown, or SRT file. It does not time lyrics from the audio or draw L01–L05. Album QC stays an empty state until comparison exists. Do not invent series, peaks, progress, or metrics.
+- The lyrics workspace edits an attached TXT, Markdown, or SRT file. It does not time lyrics from the audio. L01–L05 read stored technical evidence and the current lyric document. Album QC stays an empty state until comparison exists. Do not invent series, peaks, progress, or metrics.
 - Extend Vitest when a change would hide a wrong chart, status, or evidence class. A style or copy tweak does not need a new test.
 
 ```tsx

@@ -29,6 +29,12 @@ from app.audio import (
 from app.charts import KINDS, not_run
 from app.config import Settings, load_settings
 from app.db import asset_dict, connect, project_dict
+from app.lyric_charts import (
+    LYRIC_KINDS,
+    build_lyric_chart,
+    load_stored_charts,
+    summary_for,
+)
 from app.lyrics import (
     LYRIC_MAX_BYTES,
     LyricError,
@@ -303,6 +309,95 @@ class CanonicalEvidence(BaseModel):
     lyric_document_id: str | None
     lyric_revision: int | None
     records: list[EvidenceRef]
+
+
+EvidenceClass = Literal[
+    "measured",
+    "estimated",
+    "textual",
+    "interpretive",
+    "unknown",
+    "not_applicable",
+]
+
+
+class LyricSeriesLine(BaseModel):
+    name: str
+    unit: str
+    x: list[float]
+    y: list[float | None]
+    evidence_class: EvidenceClass
+    evidence_id: str
+
+
+class LyricSeriesBar(BaseModel):
+    label: str
+    value: float
+    evidence_class: EvidenceClass
+    evidence_id: str
+
+
+class LyricRegion(BaseModel):
+    evidence_id: str
+    segment_id: str
+    label: str
+    start_s: float
+    end_s: float
+    evidence_class: Literal["textual"]
+
+
+class LyricChartRow(BaseModel):
+    evidence_id: str
+    evidence_class: EvidenceClass
+    kind: Literal["finding", "principle"]
+    name: str
+    value: str
+    unit: str | None
+    cites: list[str]
+    caveat: str
+
+
+class InsufficientPrinciple(BaseModel):
+    code: Literal[
+        "level_contrast",
+        "written_repetition",
+        "tempo",
+        "melody",
+        "section",
+        "vocal",
+        "emotion",
+        "instrumentation",
+    ]
+    reason: str
+    cites: list[str]
+
+
+class LyricSeries(BaseModel):
+    lines: list[LyricSeriesLine] = []
+    bars: list[LyricSeriesBar] = []
+    heatmap: ChartHeatmap | None = None
+
+
+class LyricChartDocument(BaseModel):
+    chart_kind: Literal["L01", "L02", "L03", "L04", "L05"]
+    status: Literal["not_run", "ready", "not_available", "failed"]
+    title: str
+    evidence_class: EvidenceClass
+    method_id: Literal["lyrics-v1"]
+    method_version: Literal["lyrics-v1"]
+    analysis_version: Literal["m1-v3"] | None
+    lyric_document_id: str | None
+    lyric_revision: int | None
+    caveats: list[str]
+    summary: list[SummaryItem]
+    series: LyricSeries
+    axis_definitions: AxisDefinitions
+    review_markers: list[ReviewMarker]
+    regions: list[LyricRegion]
+    rows: list[LyricChartRow]
+    insufficient: list[InsufficientPrinciple]
+    not_available_reason: str | None = None
+    error: str | None = None
 
 
 def _lyric(exc: LyricError) -> AppError:
@@ -886,5 +981,34 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return canonical_evidence(connection, settings.data_root, project_id, asset_id)
         except LyricError as exc:
             raise _lyric(exc) from exc
+
+    def _lyric_inputs(project_id: str, asset_id: str) -> tuple[dict, dict, dict | None]:
+        try:
+            asset = require_membership(connection, project_id, asset_id)
+            bundle = canonical_evidence(connection, settings.data_root, project_id, asset_id)
+            document = load_document(connection, project_id, asset_id)
+        except LyricError as exc:
+            raise _lyric(exc) from exc
+        charts = load_stored_charts(settings.data_root, asset["sha256"])
+        return bundle, charts, document
+
+    @app.get(
+        "/api/projects/{project_id}/assets/{asset_id}/lyric-charts",
+        response_model=ChartList,
+    )
+    def lyric_chart_list(project_id: str, asset_id: str) -> dict:
+        bundle, charts, document = _lyric_inputs(project_id, asset_id)
+        built = [build_lyric_chart(kind, bundle, charts, document) for kind in LYRIC_KINDS]
+        return {"charts": [summary_for(item, project_id, asset_id) for item in built]}
+
+    @app.get(
+        "/api/projects/{project_id}/assets/{asset_id}/lyric-charts/{kind}/data",
+        response_model=LyricChartDocument,
+    )
+    def lyric_chart_data(project_id: str, asset_id: str, kind: str) -> dict:
+        if kind not in LYRIC_KINDS:
+            raise AppError(404, "not_found", "Unknown chart.")
+        bundle, charts, document = _lyric_inputs(project_id, asset_id)
+        return build_lyric_chart(kind, bundle, charts, document)
 
     return app

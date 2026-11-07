@@ -14,7 +14,7 @@ Apply authority in this order: the latest explicit owner decision, accepted mile
 
 ## Supporting records
 
-- [Milestone 2 plan](superpowers/plans/2026-10-13-milestone-2.md) — lyric evidence and L01–L05 design. Task order and checkboxes are historical planning.
+- [Milestone 2 plan](superpowers/plans/2026-10-13-milestone-2.md) — lyric evidence and L01–L05 design. M2-A, M2-B, and M2-C are accepted slices. Milestone 2 overall is not accepted. Task order and checkboxes are historical planning.
 - [M2-A/M2-B QA](qa/m2a-m2b-2026-10-15.md) — dated QA observations, scope limitations, and citation to the original acceptance record.
 - [Studio Precision](design/studio-precision.md) — accepted Pass 2 design and verification record. [Pass 3](design/studio-precision-pass3.md) was accepted November 7, 2026. Its readiness sections remain the proposal history.
 - [Local toolchain](ENVIRONMENT.md) — recovery notes for a stalled frontend check.

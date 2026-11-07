@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import { api, ApiError, lyricSourceUrl } from "./api/client"
 import type { AnnotationIn, AnnotationOut, LyricDocumentOut, LyricSegmentOut, LyricSegmentUpdate } from "./api/types"
 import { clock, evidenceLabel } from "./catalog"
+import { LyricCharts } from "./lyric-charts"
 
 /** A single word longer than this is offered for review. A phrase is not. */
 export const LONG_SINGLE_TOKEN_S = 2
@@ -944,6 +945,14 @@ export function LyricsWorkspace({
       <div className="editor">
         <h2>Lyrics & Inspiration</h2>
         <p>Sung timing is not guessed. Plain text stays unplaced until you assign times.</p>
+        <LyricCharts
+          projectId={project}
+          assetId={assetId}
+          documentId={document?.id ?? null}
+          revision={document?.revision ?? null}
+          playhead={playhead}
+          onSeek={onSeek}
+        />
         {project ? (
           <div className="import-row">
             <label htmlFor="lyric-file">Lyric file</label>
@@ -1123,7 +1132,7 @@ export function LyricsWorkspace({
             ) : null}
             <div>
               <dt>Limitation</dt>
-              <dd>Timing is not measured from the audio. Inspiration charts are not in this slice.</dd>
+              <dd>Timing is not measured from the audio. Charts use written intervals and stored technical samples.</dd>
             </div>
           </dl>
         ) : (

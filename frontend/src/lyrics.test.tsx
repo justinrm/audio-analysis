@@ -27,6 +27,8 @@ const api = vi.hoisted(() => ({
   verifySegment: vi.fn(),
   createAnnotation: vi.fn(),
   deleteAnnotation: vi.fn(),
+  lyricCharts: vi.fn(),
+  lyricChart: vi.fn(),
 }))
 
 const bus = vi.hoisted(() => {
@@ -211,6 +213,27 @@ describe("lyric workspace", () => {
     api.verifySegment.mockReset()
     api.createAnnotation.mockReset()
     api.deleteAnnotation.mockReset()
+    api.lyricCharts.mockResolvedValue({ charts: [] })
+    api.lyricChart.mockResolvedValue({
+      chart_kind: "L01",
+      status: "not_available",
+      title: "Unified music-and-lyrics timeline",
+      evidence_class: "unknown",
+      method_id: "lyrics-v1",
+      method_version: "lyrics-v1",
+      analysis_version: null,
+      lyric_document_id: null,
+      lyric_revision: null,
+      caveats: [],
+      summary: [],
+      series: { lines: [], bars: [], heatmap: null },
+      axis_definitions: { x: "", y: "", y_scale: "linear" },
+      review_markers: [],
+      regions: [],
+      rows: [],
+      insufficient: [],
+      not_available_reason: "Stored T02 energy is not m1-v3.",
+    })
     api.asset.mockResolvedValue({
       id: "a",
       sha256: "abc",
@@ -883,6 +906,16 @@ describe("lyric workspace", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Lyrics & Inspiration" }))
     expect((screen.getByLabelText("Text for Line 1") as HTMLTextAreaElement).value).toBe("unsaved line")
     expect(bus.created).toEqual([1])
+  })
+
+  it("keeps an unsaved lyric draft when the inspiration chart changes", async () => {
+    api.lyrics.mockResolvedValue(document({ segments: [segment({ id: "s", text: "keep", ordinal: 0 })] }))
+    workspace()
+    const line = await screen.findByLabelText("Text for Line 1")
+    fireEvent.change(line, { target: { value: "draft stays" } })
+    fireEvent.click(screen.getByRole("button", { name: /L02 Density/ }))
+    expect((screen.getByLabelText("Text for Line 1") as HTMLTextAreaElement).value).toBe("draft stays")
+    expect(bus.created).toEqual([])
   })
 
   it("saves one region edit and still seeks once", async () => {

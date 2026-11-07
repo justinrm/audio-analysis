@@ -6,6 +6,7 @@ import type {
   ChartList,
   Health,
   Job,
+  LyricChartDocument,
   LyricDocumentOut,
   LyricSegmentUpdate,
   LyricVerify,
@@ -129,4 +130,8 @@ export const api = {
     }).then(parse<AnnotationOut>),
   deleteAnnotation: (projectId: string, assetId: string, annotationId: string) =>
     fetch(`${lyricPath(projectId, assetId)}/annotations/${annotationId}`, { method: "DELETE" }).then(empty),
+  lyricCharts: (projectId: string, assetId: string) =>
+    fetch(`${lyricPath(projectId, assetId)}/lyric-charts`).then(parse<ChartList>),
+  lyricChart: (projectId: string, assetId: string, kind: string) =>
+    fetch(`${lyricPath(projectId, assetId)}/lyric-charts/${kind}/data`).then(parse<LyricChartDocument>),
 }

@@ -488,3 +488,86 @@ describe("coordinated presentation", () => {
     expect(screen.getByText(/technical review checkpoints/i)).toBeTruthy()
   })
 })
+
+describe("lyric regions", () => {
+  it("seeks a timed region and leaves a technical chart without lyric areas", () => {
+    resetPlot()
+    const seen: number[] = []
+    const timeline = {
+      ...ending,
+      chart_kind: "L01",
+      title: "Unified music-and-lyrics timeline",
+      evidence_class: "unknown",
+      method_id: "lyrics-v1",
+      method_version: "lyrics-v1",
+      series: {
+        lines: [{ name: "1 s RMS", unit: "dBFS", x: [0.5], y: [-12] }],
+        bars: [],
+        heatmap: null,
+      },
+      axis_definitions: { x: "Time (s)", y: "dBFS", y_scale: "linear" as const },
+      review_markers: [],
+      regions: [
+        {
+          evidence_id: "ly:a",
+          segment_id: "a",
+          label: "Hello",
+          start_s: 0.25,
+          end_s: 0.75,
+          evidence_class: "textual" as const,
+        },
+      ],
+    }
+    render(<ChartView chart={timeline} playhead={0.4} onSeek={(seconds) => seen.push(seconds)} />)
+    fireEvent.click(screen.getByRole("button", { name: /Hello/ }))
+    expect(seen).toEqual([0.25])
+    const series = chartOption().series as { markArea?: { data?: { xAxis?: number }[][] }; id?: string }[]
+    expect(series.some((item) => item.markArea?.data?.[0]?.[0]?.xAxis === 0.25)).toBe(true)
+    expect(series.some((item) => item.markArea?.data?.[0]?.[1]?.xAxis === 0.75)).toBe(true)
+    resetPlot()
+    render(<ChartView chart={ending} onSeek={() => undefined} />)
+    const technical = chartOption().series as { markArea?: unknown }[]
+    expect(technical.every((item) => item.markArea == null)).toBe(true)
+  })
+
+  it("does not add a file-time playhead on a line-index chart", () => {
+    resetPlot()
+    const density: ChartDocument = {
+      ...ending,
+      chart_kind: "L02",
+      title: "Phrasing and written density",
+      evidence_class: "textual",
+      series: {
+        lines: [{ name: "Written words per second", unit: "words/s", x: [1], y: [null] }],
+        bars: [{ label: "1", value: 2 }],
+        heatmap: null,
+      },
+      axis_definitions: { x: "Line", y: "Written words", y_scale: "linear" },
+      review_markers: [],
+    }
+    render(<ChartView chart={density} playhead={1.5} onSeek={() => undefined} />)
+    const series = chartOption().series as { id?: string }[]
+    expect(series.some((item) => String(item.id ?? "").startsWith("playback-playhead"))).toBe(false)
+    const xAxis = chartOption().xAxis as { name?: string }[]
+    expect(xAxis.some((axis) => axis.name === "Line")).toBe(true)
+  })
+
+  it("shows stored window labels when a lyric energy chart has no regions", () => {
+    resetPlot()
+    const energy: ChartDocument = {
+      ...ending,
+      chart_kind: "L03",
+      title: "Energy and dynamic contrast",
+      series: {
+        lines: [{ name: "1 s RMS", unit: "dBFS", x: [0.5], y: [-12] }],
+        bars: [{ label: "0.0–1.0 s", value: 1.25 }],
+        heatmap: null,
+      },
+      axis_definitions: { x: "Time (s)", y: "dBFS or LUFS", y_scale: "linear" },
+      review_markers: [],
+    }
+    render(<ChartView chart={energy} onSeek={() => undefined} />)
+    const xAxis = chartOption().xAxis as { data?: string[] }[]
+    expect(xAxis.some((axis) => axis.data?.includes("0.0–1.0 s"))).toBe(true)
+  })
+})

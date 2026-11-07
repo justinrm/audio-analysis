@@ -10,6 +10,14 @@ export type TechnicalChart = {
 
 const notRun = "Not run. Nothing has been measured for this recording."
 
+export const LYRIC = [
+  { id: "L01", title: "Unified music-and-lyrics timeline", short: "Timeline" },
+  { id: "L02", title: "Phrasing and written density", short: "Density" },
+  { id: "L03", title: "Energy and dynamic contrast", short: "Energy" },
+  { id: "L04", title: "Repetition map", short: "Repetition" },
+  { id: "L05", title: "Musical DNA and transferable principles", short: "Principles" },
+] as const
+
 export const TECHNICAL: TechnicalChart[] = [
   {
     id: "T01",

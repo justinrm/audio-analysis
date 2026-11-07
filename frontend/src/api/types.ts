@@ -141,6 +141,12 @@ export type Health = {
   analysis: "available";
 }
 
+export type InsufficientPrinciple = {
+  code: "level_contrast" | "written_repetition" | "tempo" | "melody" | "section" | "vocal" | "emotion" | "instrumentation";
+  reason: string;
+  cites: Array<string>;
+}
+
 export type Job = {
   id: string;
   asset_id: string;
@@ -148,6 +154,39 @@ export type Job = {
   created_at: string;
   updated_at: string;
   error?: string | null;
+}
+
+export type LyricChartDocument = {
+  chart_kind: "L01" | "L02" | "L03" | "L04" | "L05";
+  status: "not_run" | "ready" | "not_available" | "failed";
+  title: string;
+  evidence_class: "measured" | "estimated" | "textual" | "interpretive" | "unknown" | "not_applicable";
+  method_id: "lyrics-v1";
+  method_version: "lyrics-v1";
+  analysis_version: "m1-v3" | null;
+  lyric_document_id: string | null;
+  lyric_revision: number | null;
+  caveats: Array<string>;
+  summary: Array<SummaryItem>;
+  series: LyricSeries;
+  axis_definitions: AxisDefinitions;
+  review_markers: Array<ReviewMarker>;
+  regions: Array<LyricRegion>;
+  rows: Array<LyricChartRow>;
+  insufficient: Array<InsufficientPrinciple>;
+  not_available_reason?: string | null;
+  error?: string | null;
+}
+
+export type LyricChartRow = {
+  evidence_id: string;
+  evidence_class: "measured" | "estimated" | "textual" | "interpretive" | "unknown" | "not_applicable";
+  kind: "finding" | "principle";
+  name: string;
+  value: string;
+  unit: string | null;
+  cites: Array<string>;
+  caveat: string;
 }
 
 export type LyricDocumentOut = {
@@ -161,6 +200,15 @@ export type LyricDocumentOut = {
   revision: number;
   segments: Array<LyricSegmentOut>;
   validation: Array<LyricValidationOut>;
+}
+
+export type LyricRegion = {
+  evidence_id: string;
+  segment_id: string;
+  label: string;
+  start_s: number;
+  end_s: number;
+  evidence_class: "textual";
 }
 
 export type LyricSegmentOut = {
@@ -183,6 +231,28 @@ export type LyricSegmentUpdate = {
   end_s?: number | null;
   note?: string | null;
   clear_timing?: boolean;
+}
+
+export type LyricSeries = {
+  lines?: Array<LyricSeriesLine>;
+  bars?: Array<LyricSeriesBar>;
+  heatmap?: ChartHeatmap | null;
+}
+
+export type LyricSeriesBar = {
+  label: string;
+  value: number;
+  evidence_class: "measured" | "estimated" | "textual" | "interpretive" | "unknown" | "not_applicable";
+  evidence_id: string;
+}
+
+export type LyricSeriesLine = {
+  name: string;
+  unit: string;
+  x: Array<number>;
+  y: Array<number | null>;
+  evidence_class: "measured" | "estimated" | "textual" | "interpretive" | "unknown" | "not_applicable";
+  evidence_id: string;
 }
 
 export type LyricValidationOut = {

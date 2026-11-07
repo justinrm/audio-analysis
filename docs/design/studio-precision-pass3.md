@@ -2,13 +2,13 @@
 
 ## Acceptance
 
-On November 7, 2026, the owner accepted Studio Precision Pass 3, Option B. The same-day implementation instruction authorized the work. This section records the later acceptance. Scope: coordinated ECharts and Matplotlib presentation, in-page chart data tables, and `png-r1` regeneration from stored chart JSON. `m1-v3` is unchanged. Milestone 2-C is not authorized.
+On November 7, 2026, the owner accepted Studio Precision Pass 3, Option B. The same-day implementation instruction authorized the work. This section records the later acceptance. Scope: coordinated ECharts and Matplotlib presentation, in-page chart data tables, and `png-r1` regeneration from stored chart JSON. `m1-v3` is unchanged. This acceptance does not include Milestone 2-C. A later decision the same day accepted that implementation separately. This Pass 3 record is unchanged by that decision.
 
 Accepted limitations: native keyboard activation of the data-table controls was not manually verified. Legacy PNGs are unavailable on the current image route until refresh. G3, G4, and G6 stay open, including the stored T03 `dB` unit, chart zoom that is independent of the waveform, and omitted mixed line/bar PNG panels.
 
 ## Authorization
 
-On November 7, 2026, the owner authorized implementation of Option B. Included: coordinated ECharts and Matplotlib presentation, bounded in-page accessible chart tables, and safe cached PNG regeneration from canonical chart JSON. `m1-v3` stays unchanged. That authorization is historical. Acceptance is recorded above. It does not authorize Milestone 2-C.
+On November 7, 2026, the owner authorized implementation of Option B. Included: coordinated ECharts and Matplotlib presentation, bounded in-page accessible chart tables, and safe cached PNG regeneration from canonical chart JSON. `m1-v3` stays unchanged. That authorization is historical. Acceptance is recorded above. It does not authorize Milestone 2-C. The later M2-C acceptance is recorded in [PROJECT_STATUS.md](../../PROJECT_STATUS.md).
 
 The sections below are the readiness proposal. Where they defer PNG parity or omit accessible tables, Option B supersedes that deferral for the approved axis, unit, scale, table, and regeneration work. The omission of mixed line/bar panels from some PNGs stays a tracked renderer gap unless an authorized fix requires one panel. G3, G4, and G6 are not marked resolved here.
 
