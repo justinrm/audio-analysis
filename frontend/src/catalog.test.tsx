@@ -118,6 +118,10 @@ describe("milestone 1 analysis state", () => {
       />,
     )
     expect(screen.getByText(/-14\.2 LUFS/)).toBeTruthy()
+    expect(screen.getByRole("heading", { name: /Loudness and dynamics/ }).textContent).toMatch(/Measured/)
+    expect(screen.getByText("Status: Ready")).toBeTruthy()
+    expect(screen.getByText("Short files make the loudness range unstable.")).toBeTruthy()
+    expect(screen.getByRole("heading", { name: "Limitations" })).toBeTruthy()
     expect(screen.getByRole("button", { name: /T03/i }).textContent).toMatch(/Failed/)
     expect(screen.queryByRole("progressbar")).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: /sample peak/i }))

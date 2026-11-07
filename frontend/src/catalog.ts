@@ -3,6 +3,7 @@ import type { Asset, PeakBucket } from "./api/types"
 export type TechnicalChart = {
   id: string
   title: string
+  short: string
   status: "not_run"
   note: string
 }
@@ -13,18 +14,19 @@ export const TECHNICAL: TechnicalChart[] = [
   {
     id: "T01",
     title: "Waveform and peak envelope",
+    short: "Waveform",
     status: "not_run",
     note: "The transport drawing is a playback preview, not this chart.",
   },
-  { id: "T02", title: "Loudness and dynamics", status: "not_run", note: notRun },
-  { id: "T03", title: "Long-term spectral balance", status: "not_run", note: notRun },
-  { id: "T04", title: "Spectrogram", status: "not_run", note: notRun },
-  { id: "T05", title: "Stereo and mono compatibility", status: "not_run", note: notRun },
-  { id: "T06", title: "Rhythm and pulse evidence", status: "not_run", note: notRun },
-  { id: "T07", title: "Pitch-class and tonal estimates", status: "not_run", note: notRun },
-  { id: "T08", title: "Structure novelty", status: "not_run", note: notRun },
-  { id: "T09", title: "Recurrence and self-similarity", status: "not_run", note: notRun },
-  { id: "T10", title: "Ending, gap, and anomaly review", status: "not_run", note: notRun },
+  { id: "T02", title: "Loudness and dynamics", short: "Loudness", status: "not_run", note: notRun },
+  { id: "T03", title: "Long-term spectral balance", short: "Spectrum", status: "not_run", note: notRun },
+  { id: "T04", title: "Spectrogram", short: "Spectrogram", status: "not_run", note: notRun },
+  { id: "T05", title: "Stereo and mono compatibility", short: "Stereo", status: "not_run", note: notRun },
+  { id: "T06", title: "Rhythm and pulse evidence", short: "Pulse", status: "not_run", note: notRun },
+  { id: "T07", title: "Pitch-class and tonal estimates", short: "Pitch", status: "not_run", note: notRun },
+  { id: "T08", title: "Structure novelty", short: "Novelty", status: "not_run", note: notRun },
+  { id: "T09", title: "Recurrence and self-similarity", short: "Recurrence", status: "not_run", note: notRun },
+  { id: "T10", title: "Ending, gap, and anomaly review", short: "Events", status: "not_run", note: notRun },
 ]
 
 export function playbackCaption(asset: Pick<Asset, "subtype" | "playback_status">): string {

@@ -33,7 +33,11 @@ These edits follow the documentation-update rule. They do not change the audit f
 
 | Document | Change |
 | --- | --- |
-| [PROJECT_STATUS.md](../PROJECT_STATUS.md) | Kept the November 6 audit's unknown-checkout record. Added the later verified baseline: local `main`, clean before the patch, synchronized with `origin/main`, at `260cb677`. HEAD remains that commit. The reconciliation is staged and not committed. |
+| [PROJECT_STATUS.md](../PROJECT_STATUS.md) | Kept the November 6 audit's unknown-checkout record. Added the later verified baseline: local `main`, clean before the patch, synchronized with `origin/main`, at `260cb677`. At the time of this pass, HEAD remained that commit and the reconciliation was staged, not committed. See the November 7 correction below. |
 | [NEXT_SESSION.md](../NEXT_SESSION.md) | Made the same distinction between the audit record and the verified baseline. The handoff still requires a fresh Git inspection and an explicit owner decision. |
 | [MVP specification](01_TECHNICAL_MVP_SPEC.md) | Separated **Role** and **Prepared** with a blank line so they do not render as one line. No trailing whitespace was added. |
 | [Root README](../README.md) | Removed one extra blank line at the end of the file introduced by the supplied patch, so the diff has no end-of-file whitespace error. Wording is unchanged. |
+
+## November 7, 2026 — reconciliation commit
+
+`PROJECT_STATUS.md` and `NEXT_SESSION.md` still described the reconciliation as staged, with HEAD at `260cb677`. That described the worktree before commit `b35cdb1`. Those two files now label the November 6 audit and the pre-integration check as historical, and they record `b35cdb1` on local `main` and `origin/main` with a clean worktree on November 7, 2026. That wording correction does not itself accept a milestone. It is included with the later Pass 3 acceptance commit.

@@ -5,6 +5,7 @@ import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js"
 import { api, streamUrl } from "./api/client"
 import type { Asset, ChartDocument, ChartSummary, Job, Peaks } from "./api/types"
 import { ChartView } from "./chart"
+import { ChartDataTable } from "./chart-data-table"
 import { clock, evidenceLabel, formatLabel, playbackCaption, statusLabel, TECHNICAL, toWavePeaks } from "./catalog"
 import {
   cueColor,
@@ -39,7 +40,12 @@ export function TechnicalBoard({
   const [holdLyrics, setHoldLyrics] = useState(false)
   const rows = TECHNICAL.map((item) => {
     const live = charts.find((chart) => chart.chart_kind === item.id)
-    return { id: item.id, title: live?.title || item.title, status: live?.status ?? "not_run" }
+    return {
+      id: item.id,
+      title: live?.title || item.title,
+      short: item.short,
+      status: live?.status ?? "not_run",
+    }
   })
   const selected = rows.find((row) => row.id === chartId) ?? rows[0]
   const active = document?.chart_kind === selected.id ? document : null
@@ -97,12 +103,13 @@ export function TechnicalBoard({
                     aria-current={item.id === selected.id ? "true" : undefined}
                     onClick={() => onSelect(item.id)}
                   >
-                    {item.id} {item.title}
+                    {item.id} {item.short}
                     <br />
                     <small>{statusLabel(item.status)}</small>
                   </button>
                 ))}
               </div>
+              <p className="chart-scroll-hint">Scroll for more charts</p>
             </div>
           ) : null}
           {holdLyrics && lyricsPanel ? (
@@ -130,9 +137,13 @@ export function TechnicalBoard({
             <div className="plot">
               <h2>
                 {selected.id} {selected.title}
+                {active && active.status !== "not_run" ? (
+                  <span className="evidence-word"> {evidenceLabel(active.evidence_class)}</span>
+                ) : null}
               </h2>
               <p>Status: {statusLabel(active?.status ?? selected.status)}</p>
               {active?.status === "ready" ? <ChartView chart={active} onSeek={onSeek} playhead={playhead} /> : null}
+              {active && active.status !== "ready" ? <ChartDataTable chart={active} /> : null}
               {active && active.status !== "ready" && active.status !== "not_run" ? (
                 <p className="feedback is-alert" role="alert">
                   {active.not_available_reason || active.error}
@@ -153,30 +164,45 @@ export function TechnicalBoard({
               <h2>Evidence</h2>
               {loadingChart ? <p className="quiet">Evidence for this chart is still loading.</p> : null}
               {!loadingChart && active && active.status !== "not_run" ? (
-                <dl className="evidence">
-                  <div>
-                    <dt>Class</dt>
-                    <dd>{evidenceLabel(active.evidence_class)}</dd>
-                  </div>
-                  <div>
-                    <dt>Method</dt>
-                    <dd>
-                      {active.method_id} {active.method_version}
-                    </dd>
-                  </div>
-                  {active.summary.map((item) => (
-                    <div key={item.label}>
-                      <dt>{item.label}</dt>
-                      <dd className="num">{item.value}</dd>
+                <>
+                  <h3>Identity</h3>
+                  <dl className="evidence">
+                    <div>
+                      <dt>Class</dt>
+                      <dd>{evidenceLabel(active.evidence_class)}</dd>
                     </div>
-                  ))}
-                  {active.caveats.map((item) => (
-                    <div key={item}>
-                      <dt>Limitation</dt>
-                      <dd>{item}</dd>
+                    <div>
+                      <dt>Method</dt>
+                      <dd>{active.method_id}</dd>
                     </div>
-                  ))}
-                </dl>
+                    <div>
+                      <dt>Version</dt>
+                      <dd>{active.method_version}</dd>
+                    </div>
+                  </dl>
+                  <h3>Figures</h3>
+                  <dl className="evidence">
+                    {active.summary.map((item) => (
+                      <div key={item.label}>
+                        <dt>{item.label}</dt>
+                        <dd className="num">{item.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <h3>Limitations</h3>
+                  {active.caveats.length > 0 ? (
+                    <dl className="evidence">
+                      {active.caveats.map((item) => (
+                        <div key={item}>
+                          <dt>Limitation</dt>
+                          <dd>{item}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : (
+                    <p className="quiet">None recorded.</p>
+                  )}
+                </>
               ) : null}
               {!loadingChart && (!active || active.status === "not_run") ? <p>No evidence yet.</p> : null}
             </aside>

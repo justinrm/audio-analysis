@@ -47,6 +47,7 @@ from app.lyrics import (
 )
 from app.measure import ALGORITHM_VERSION, PARAMS_HASH
 from app.pipeline import analysis_dir, empty_registry, public_summary
+from app.png import RENDERER_VERSION, rendered_png
 from app.worker import AnalysisWorker
 
 
@@ -694,10 +695,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         asset = _require_asset(connection, asset_id)
         if kind not in KINDS:
             raise AppError(404, "not_found", "Unknown chart.")
-        path = analysis_dir(settings.data_root, asset["sha256"]) / f"{kind}.png"
-        if not path.is_file():
-            raise AppError(404, "png_unavailable", "No PNG was written for this chart.")
-        return FileResponse(path, media_type="image/png")
+        path = rendered_png(analysis_dir(settings.data_root, asset["sha256"]), kind)
+        if path is None:
+            raise AppError(404, "png_unavailable", "No current PNG was written for this chart.")
+        return FileResponse(
+            path,
+            media_type="image/png",
+            headers={"X-Renderer-Version": RENDERER_VERSION, "Cache-Control": "no-cache"},
+        )
 
     @app.get("/api/assets/{asset_id}/metrics")
     def metrics(asset_id: str) -> dict:

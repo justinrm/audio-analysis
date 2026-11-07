@@ -507,6 +507,72 @@ textarea {
   min-height: 22rem;
 }
 
+.chart-scroll-hint {
+  display: none;
+}
+
+.evidence-word,
+.chart-caption {
+  color: var(--color-secondary);
+  font-weight: 500;
+}
+
+.evidence-word {
+  margin-left: 0.45rem;
+  font-size: 0.8rem;
+}
+
+.chart-caption {
+  margin: 0 0 0.35rem;
+}
+
+.inspector h3 {
+  margin: 0.85rem 0 0.25rem;
+  color: var(--color-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chart-data-scroll {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+
+.chart-data {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.chart-data caption {
+  caption-side: top;
+  text-align: left;
+  margin-bottom: 0.35rem;
+  color: var(--color-secondary);
+}
+
+.chart-data th,
+.chart-data td {
+  padding: 0.35rem 0.6rem 0.35rem 0;
+  border-bottom: 1px solid var(--color-rule);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.chart-data-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.chart-data-pages input {
+  width: 4rem;
+  margin-left: 0.35rem;
+}
+
 .markers {
   margin: 0.4rem 0 0;
   padding: 0;
@@ -515,6 +581,11 @@ textarea {
 
 .markers li {
   margin-top: 0.35rem;
+}
+
+.markers button,
+.markers .quiet {
+  display: block;
 }
 
 .markers button {
@@ -717,10 +788,33 @@ textarea {
 }
 
 @media (max-width: 1099px) and (min-width: 928px) {
+  .chart-scroll-hint {
+    display: block;
+    margin: 0.35rem 0 0;
+    color: var(--color-secondary);
+    font-size: 0.75rem;
+  }
+
+  .chart-nav {
+    position: relative;
+  }
+
+  .chart-nav::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 1.75rem;
+    height: 2.4rem;
+    pointer-events: none;
+    background: linear-gradient(to right, transparent, var(--color-ground));
+  }
+
   .chart-buttons {
     display: flex;
     gap: 0.35rem;
     overflow-x: auto;
+    padding-inline-end: 1.75rem;
   }
 
   .chart-buttons .category {

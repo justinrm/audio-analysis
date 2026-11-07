@@ -8,7 +8,7 @@ from pathlib import Path
 
 from app.charts import KINDS, build_all, not_run
 from app.measure import ALGORITHM_VERSION, PARAMS_HASH, decode_wav
-from app.png import write_png
+from app.png import RENDERER_VERSION, presentation_png, publish_png, write_manifest
 
 DECODER_NOTE = (
     "Integer PCM is divided by its own full scale: 32768 for 16-bit and "
@@ -30,14 +30,17 @@ def run_analysis(master: Path, dest: Path, asset_id: str, sha256: str) -> dict:
     if dest.exists():
         shutil.rmtree(dest)
     dest.mkdir(parents=True)
+    written: list[str] = []
     for kind, document in charts.items():
         (dest / f"{kind}.json").write_text(dumps(document))
         if document["status"] == "ready":
             try:
-                write_png(dest / f"{kind}.png", document)
+                publish_png(presentation_png(dest, kind), document)
+                written.append(kind)
             except Exception as exc:  # noqa: BLE001 - a missing PNG must not drop the measurements
                 document["caveats"].append(f"PNG was not written: {type(exc).__name__}")
                 (dest / f"{kind}.json").write_text(dumps(document))
+    write_manifest(dest, written, ALGORITHM_VERSION)
     metrics = _metrics(audio, charts, asset_id, sha256)
     evidence = _evidence(audio, charts, asset_id, metrics)
     (dest / "metrics.json").write_text(dumps(metrics))
@@ -178,7 +181,9 @@ def public_summary(document: dict, asset_id: str) -> dict:
         "not_available_reason": document.get("not_available_reason"),
         "error": document.get("error"),
         "data_url": f"/api/assets/{asset_id}/charts/{kind}/data",
-        "png_url": f"/api/assets/{asset_id}/charts/{kind}/image" if ready else None,
+        "png_url": (
+            f"/api/assets/{asset_id}/charts/{kind}/image?renderer={RENDERER_VERSION}" if ready else None
+        ),
     }
 
 

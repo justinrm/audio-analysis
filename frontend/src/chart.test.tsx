@@ -303,7 +303,9 @@ describe("synchronized zoom", () => {
     expect(xAxis.every((axis) => axis.name === "Time (s)")).toBe(true)
     const yAxis = option.yAxis as { name?: string; data?: string[] }[]
     expect(yAxis[0]?.name).toBe("Frequency (Hz)")
-    expect(yAxis[0]?.data).toEqual(["100", "1000"])
+    expect(yAxis[0]?.data).toEqual(["100 Hz", "1 kHz"])
+    const map = option.visualMap as { show?: boolean }
+    expect(map.show).toBe(true)
   })
 
   it("seeks a spectrogram click to the bin time, not the fractional index", () => {
@@ -328,8 +330,9 @@ describe("synchronized zoom", () => {
     const yAxis = option.yAxis as { data?: string[]; name?: string }[]
     expect(xAxis[0]?.name).toBe("Time (s)")
     expect(yAxis[0]?.name).toBe("Time (s)")
-    expect(xAxis[0]?.data).toEqual(["1.0", "3.0", "5.0"])
+    expect(xAxis[0]?.data).toEqual(["0:01", "0:03", "0:05"])
     expect(yAxis[0]?.data).toEqual(xAxis[0]?.data)
+    expect(xAxis[0]?.data).toHaveLength(3)
   })
 })
 
@@ -344,5 +347,144 @@ describe("T06 candidate labels", () => {
       String(item.id).startsWith("playback-playhead"),
     )
     expect(series.map((item) => item.xAxisIndex)).toEqual([0])
+    const labels = (option.xAxis as { data?: string[] }[])[1]?.data
+    expect(labels).toEqual(["120.0 BPM", "60.0 BPM (half-time)"])
+  })
+})
+
+describe("coordinated presentation", () => {
+  it("keeps stored numbers unchanged while formatting the display", () => {
+    const snapshot = JSON.stringify(waveform)
+    resetPlot()
+    render(<ChartView chart={waveform} onSeek={() => undefined} />)
+    expect(JSON.stringify(waveform)).toBe(snapshot)
+    const series = chartOption().series as { name?: string; data?: [number, number][] }[]
+    const rms = series.find((item) => item.name === "100 ms RMS")
+    expect(rms?.data).toEqual([
+      [0.1, -80],
+      [0.2, -6],
+    ])
+  })
+
+  it("splits dBFS and LUFS onto separate axes without converting values", () => {
+    const loudness: ChartDocument = {
+      ...waveform,
+      chart_kind: "T02",
+      title: "Loudness and dynamics",
+      series: {
+        lines: [
+          { name: "1 s RMS", unit: "dBFS", x: [1, 2], y: [-20, -10] },
+          { name: "3 s short-term LUFS", unit: "LUFS", x: [1, 2], y: [-16, -9] },
+        ],
+        bars: [{ label: "0.0–1.0 s", value: 0.4 }],
+        heatmap: null,
+      },
+      axis_definitions: { x: "Time (s)", y: "Relative RMS-power level (dB)", y_scale: "linear" },
+    }
+    resetPlot()
+    render(<ChartView chart={loudness} onSeek={() => undefined} />)
+    const yAxis = chartOption().yAxis as { name?: string }[]
+    expect(yAxis.map((axis) => axis.name)).toEqual(["dBFS", "LUFS", "Relative RMS-power level (dB)"])
+    const series = chartOption().series as { name?: string; data?: [number, number][]; yAxisIndex?: number }[]
+    expect(series.find((item) => item.name === "3 s short-term LUFS")?.data).toEqual([
+      [1, -16],
+      [2, -9],
+    ])
+    expect(series.find((item) => item.name === "1 s RMS")?.yAxisIndex).toBe(0)
+    expect(series.find((item) => item.name === "3 s short-term LUFS")?.yAxisIndex).toBe(1)
+    expect(loudness.axis_definitions.y_scale).toBe("linear")
+  })
+
+  it("shows the stored Welch samples on a log frequency axis and does not seek", () => {
+    const spectrum: ChartDocument = {
+      ...waveform,
+      chart_kind: "T03",
+      title: "Long-term spectral balance",
+      series: {
+        lines: [{ name: "Welch PSD", unit: "dB", x: [20, 1000, 8000], y: [-80, -40, -20] }],
+        bars: [{ label: "20–500 Hz", value: 12.5 }],
+        heatmap: null,
+      },
+      axis_definitions: { x: "Frequency (Hz)", y: "Power share (%)", y_scale: "linear" },
+      review_markers: [],
+    }
+    const snapshot = JSON.stringify(spectrum)
+    resetPlot()
+    const seen: number[] = []
+    render(<ChartView chart={spectrum} onSeek={(seconds) => seen.push(seconds)} />)
+    const xAxis = chartOption().xAxis as { type?: string; min?: number; max?: number }[]
+    expect(xAxis[0]?.type).toBe("log")
+    expect(xAxis[0]?.min).toBe(20)
+    expect(xAxis[0]?.max).toBe(8000)
+    const series = chartOption().series as { name?: string; data?: [number, number][] }[]
+    expect(series.find((item) => item.name === "Welch PSD")?.data).toEqual([
+      [20, -80],
+      [1000, -40],
+      [8000, -20],
+    ])
+    plotted.point = [1000, -40]
+    plotted.click?.({ offsetX: 8, offsetY: 8 })
+    expect(seen).toEqual([])
+    expect(JSON.stringify(spectrum)).toBe(snapshot)
+    expect(spectrum.axis_definitions.y_scale).toBe("linear")
+    expect(spectrum.series.lines?.[0]?.unit).toBe("dB")
+  })
+
+  it("gives correlation and side/mid their own bounds", () => {
+    const stereo: ChartDocument = {
+      ...waveform,
+      chart_kind: "T05",
+      title: "Stereo and mono compatibility",
+      series: {
+        lines: [
+          { name: "1 s correlation", unit: "ratio", x: [0, 1], y: [0.2, 0.9] },
+          { name: "1 s side/mid", unit: "dB", x: [0, 1], y: [-30, -4] },
+        ],
+        bars: [],
+        heatmap: null,
+      },
+      review_markers: [],
+    }
+    resetPlot()
+    render(<ChartView chart={stereo} onSeek={() => undefined} />)
+    const yAxis = chartOption().yAxis as { name?: string; min?: number; max?: number }[]
+    expect(yAxis.map((axis) => axis.name)).toEqual(["Correlation", "Side/mid (dB)"])
+    expect(yAxis[0]?.min).toBe(-1)
+    expect(yAxis[0]?.max).toBe(1)
+    const series = chartOption().series as { name?: string; data?: [number, number][] }[]
+    expect(series.find((item) => item.name === "1 s side/mid")?.data?.[1]).toEqual([1, -4])
+  })
+
+  it("keeps pitch-class shares on a 0 to 1 axis", () => {
+    const pitch: ChartDocument = {
+      ...ending,
+      chart_kind: "T07",
+      title: "Pitch-class and tonal estimates",
+      evidence_class: "estimated",
+      series: {
+        lines: [],
+        bars: [
+          { label: "C", value: 0.08 },
+          { label: "D", value: 0.1 },
+        ],
+        heatmap: null,
+      },
+      axis_definitions: { x: "Pitch class", y: "Share", y_scale: "linear" },
+      review_markers: [],
+    }
+    resetPlot()
+    render(<ChartView chart={pitch} onSeek={() => undefined} />)
+    const yAxis = chartOption().yAxis as { min?: number; max?: number; name?: string }[]
+    expect(yAxis[0]?.name).toBe("Share")
+    expect(yAxis[0]?.min).toBe(0)
+    expect(yAxis[0]?.max).toBe(1)
+    const series = chartOption().series as { data?: number[] }[]
+    expect(series[0]?.data).toEqual([0.08, 0.1])
+  })
+
+  it("captions the ending chart without drawing checkpoints on the bars", () => {
+    resetPlot()
+    render(<ChartView chart={ending} onSeek={() => undefined} />)
+    expect(screen.getByText(/technical review checkpoints/i)).toBeTruthy()
   })
 })

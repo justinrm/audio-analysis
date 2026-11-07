@@ -1,6 +1,28 @@
 import { useEffect, useRef } from "react"
 import * as echarts from "echarts"
-import type { ChartDocument, ReviewMarker } from "./api/types"
+import type { ChartDocument, ChartLine, ReviewMarker } from "./api/types"
+import { evidenceLabel } from "./catalog"
+import {
+  AXIS_TITLE,
+  formatCategoryLabel,
+  formatFileTime,
+  formatFrequency,
+  formatLevelTick,
+  formatStored,
+  formatTooltipValue,
+  frequencyTickLabels,
+  HEATMAP_COLORS,
+  PLOT_GROUND,
+  SERIES_ENERGY,
+  SERIES_ESTIMATED,
+  SERIES_INK,
+  SERIES_PLAYHEAD,
+  SERIES_REVIEW,
+  seriesPaint,
+  sparseTimeLabels,
+  tickBudget,
+} from "./chart-format"
+import { ChartDataTable } from "./chart-data-table"
 
 type AxisMode = "value" | "category" | "off"
 
@@ -19,6 +41,17 @@ type BuiltChart = {
   playheads: PlayheadAxis[]
   switchResolution: boolean
 }
+
+type LineGroup = {
+  lines: ChartLine[]
+  yName: string
+  yMin?: number
+  yMax?: number
+  xScale?: "log"
+}
+
+const TICK = { color: SERIES_INK, fontSize: 11, hideOverlap: true }
+const NAME = { color: AXIS_TITLE, fontSize: 12 }
 
 export function ChartView({
   chart,
@@ -44,9 +77,14 @@ export function ChartView({
     }
     const plot = echarts.init(element)
     plotRef.current = plot
-    const built = optionFor(chart, getComputedStyle(element).color, playheadRef.current)
-    playheadsRef.current = built.playheads
-    plot.setOption(built.option)
+    let bucket = tickBudget(element.clientWidth)
+    const apply = (width: number) => {
+      const built = optionFor(chart, playheadRef.current, width)
+      playheadsRef.current = built.playheads
+      plot.setOption(built.option, { notMerge: true })
+      return built
+    }
+    const built = apply(element.clientWidth)
     plot.getZr().on("click", (event) => {
       const pixel: [number, number] = [event.offsetX, event.offsetY]
       const option = plot.getOption()
@@ -75,14 +113,22 @@ export function ChartView({
     })
     if (built.switchResolution) {
       plot.on("datazoom", (event) => {
-        const zoom = event as { start?: number; end?: number; batch?: { start?: number; end?: number }[] }
-        const batch = zoom.batch?.[0]
-        const start = batch?.start ?? zoom.start ?? 0
-        const end = batch?.end ?? zoom.end ?? 100
+        const zoomEvent = event as { start?: number; end?: number; batch?: { start?: number; end?: number }[] }
+        const batch = zoomEvent.batch?.[0]
+        const start = batch?.start ?? zoomEvent.start ?? 0
+        const end = batch?.end ?? zoomEvent.end ?? 100
         plot.setOption({ legend: { selected: resolutionSelected(end - start < 99.5) } })
       })
     }
-    const observer = new ResizeObserver(() => plot.resize())
+    const observer = new ResizeObserver(() => {
+      plot.resize()
+      const next = tickBudget(element.clientWidth)
+      if (next === bucket) {
+        return
+      }
+      bucket = next
+      apply(element.clientWidth)
+    })
     observer.observe(element)
     return () => {
       observer.disconnect()
@@ -112,10 +158,26 @@ export function ChartView({
   const lines = chart.series.lines?.length ?? 0
   const bars = chart.series.bars?.length ?? 0
   const heat = (chart.series.heatmap?.z.length ?? 0) > 0
-  const stacked = (lines > 0 && (bars > 0 || heat)) || splitsLevels(chart) || heat
+  const stacked = (lines > 0 && (bars > 0 || heat)) || splitsLevels(chart) || heat || chart.chart_kind === "T02" || chart.chart_kind === "T05"
+  const describedBy = `${chart.chart_kind}-desc`
   return (
     <>
-      <div ref={node} className={stacked ? "chart stacked" : "chart"} role="img" aria-label={chart.title} />
+      {chart.chart_kind === "T10" ? (
+        <p className="chart-caption">
+          Ending bars are RMS levels for the last milliseconds. The list below is technical review checkpoints.
+          Those are different information.
+        </p>
+      ) : null}
+      <p className="quiet" id={describedBy}>
+        {evidenceLabel(chart.evidence_class)}. {chart.axis_definitions.x}. {chart.axis_definitions.y}.
+      </p>
+      <div
+        ref={node}
+        className={stacked ? "chart stacked" : "chart"}
+        role="img"
+        aria-label={chart.title}
+        aria-describedby={describedBy}
+      />
       {chart.review_markers.length > 0 ? (
         <ul className="markers">
           {chart.review_markers.map((marker) => (
@@ -128,6 +190,7 @@ export function ChartView({
           ))}
         </ul>
       ) : null}
+      <ChartDataTable chart={chart} />
     </>
   )
 }
@@ -149,43 +212,47 @@ function timeOf(chart: ChartDocument, raw: unknown): number | null {
   return index
 }
 
-function optionFor(chart: ChartDocument, ink: string, playhead: number | null): BuiltChart {
+function optionFor(chart: ChartDocument, playhead: number | null, plotWidth: number): BuiltChart {
   const lines = chart.series.lines ?? []
   const bars = chart.series.bars ?? []
   const heat = chart.series.heatmap
-  const text = ink || "#1c1917"
   const grids: echarts.GridComponentOption[] = []
   const xAxis: echarts.XAXisComponentOption[] = []
   const yAxis: echarts.YAXisComponentOption[] = []
   const series: echarts.SeriesOption[] = []
   const playheads: PlayheadAxis[] = []
-  const panels = [heat && heat.z.length > 0, lines.length > 0, bars.length > 0].filter(Boolean).length
-  const band = panels > 1 ? `${Math.floor(70 / panels)}%` : undefined
+  const budget = tickBudget(plotWidth)
 
   if (heat && heat.z.length > 0) {
     const index = grids.length
-    const flat = heat.z.flat()
+    const flat = heat.z.flat().filter((value) => Number.isFinite(value))
     const yIsTime = fileTime(chart.axis_definitions.y)
-    const legendRoom = lines.length > 1 ? 64 : 28
     grids.push({
-      left: yIsTime ? 56 : 72,
-      right: 16,
-      top: legendRoom,
-      height: band,
-      bottom: band ? undefined : 52,
+      left: yIsTime ? 80 : 92,
+      right: 78,
+      top: lines.length > 1 ? 44 : 28,
+      height: lines.length > 0 ? "46%" : undefined,
+      bottom: lines.length > 0 ? undefined : 72,
     })
     xAxis.push({
       type: "category",
       gridIndex: index,
       name: chart.axis_definitions.x,
-      data: timeLabels(heat.x),
+      nameLocation: "middle",
+      nameGap: 28,
+      nameTextStyle: NAME,
+      data: fileTime(chart.axis_definitions.x) ? sparseTimeLabels(heat.x, budget) : heat.x.map(String),
+      axisLabel: TICK,
     })
     yAxis.push({
       type: "category",
       gridIndex: index,
       name: chart.axis_definitions.y,
-      data: yIsTime ? timeLabels(heat.y) : heat.y.map((hz) => String(Math.round(hz))),
-      axisLabel: { hideOverlap: true },
+      nameLocation: "middle",
+      nameGap: 56,
+      nameTextStyle: NAME,
+      data: yIsTime ? sparseTimeLabels(heat.y, budget) : frequencyTickLabels(heat.y),
+      axisLabel: TICK,
     })
     remember(playheads, index, index, chart.axis_definitions.x, chart.axis_definitions.y, heat.x, yIsTime ? heat.y : undefined)
     series.push({
@@ -197,130 +264,143 @@ function optionFor(chart: ChartDocument, ink: string, playhead: number | null): 
     if (lines.length > 0) {
       const lineIndex = grids.length
       const extent = valueExtent(heat.x)
-      grids.push({ left: 72, right: 16, top: "58%", bottom: 48 })
+      grids.push({ left: 92, right: 78, top: "58%", bottom: 96 })
       xAxis.push({
         type: "value",
         gridIndex: lineIndex,
         name: chart.axis_definitions.x,
+        nameLocation: "middle",
+        nameGap: 28,
+        nameTextStyle: NAME,
         ...(extent ? { min: extent.min, max: extent.max } : {}),
+        axisLabel: { ...TICK, formatter: (value: number) => formatFileTime(value) },
       })
-      yAxis.push({ type: "value", gridIndex: lineIndex, name: lines[0]?.unit })
+      yAxis.push({
+        type: "value",
+        gridIndex: lineIndex,
+        name: lines[0]?.unit,
+        nameLocation: "middle",
+        nameGap: 56,
+        nameTextStyle: NAME,
+        axisLabel: TICK,
+      })
       remember(playheads, lineIndex, lineIndex, chart.axis_definitions.x, lines[0]?.unit)
-      for (const line of lines) {
-        series.push({
-          type: "line",
-          xAxisIndex: lineIndex,
-          yAxisIndex: lineIndex,
-          name: line.name,
-          showSymbol: false,
-          data: line.x.map((x, i) => [x, line.y[i]]),
-        })
-      }
-    }
-    return finish(withMap(text, grids, xAxis, yAxis, series, flat, chart, playheads), playheads, playhead, false)
-  }
-
-  if (splitsLevels(chart)) {
-    const amplitude = lines.filter((line) => line.unit === "amplitude")
-    const levels = lines.filter((line) => line.unit === "dBFS")
-    pushLines(chart, grids, xAxis, yAxis, series, playheads, amplitude, "Normalized amplitude", {
-      left: 64,
-      right: 16,
-      top: 64,
-      height: "28%",
-    })
-    pushLines(chart, grids, xAxis, yAxis, series, playheads, levels, "dBFS", {
-      left: 64,
-      right: 16,
-      top: "58%",
-      height: "24%",
-    })
-    const legend: echarts.LegendComponentOption = { top: 0, textStyle: { color: text } }
-    const switchResolution = switchesResolution(chart)
-    if (switchResolution) {
-      legend.selected = resolutionSelected(false)
-    }
-    return finish(
-      {
-        animation: false,
-        textStyle: { color: text },
-        color: [text, "#9a3412", "#1f4b99"],
-        legend,
-        grid: grids,
-        xAxis,
-        yAxis,
-        series,
-        dataZoom: zoomIndexes(playheads),
-      },
-      playheads,
-      playhead,
-      switchResolution,
-    )
-  }
-
-  if (lines.length > 0) {
-    const index = grids.length
-    const yName = lineAxisName(chart, lines)
-    grids.push({ left: 56, right: 16, top: 28, height: band, bottom: band ? undefined : 36 })
-    xAxis.push({ type: "value", gridIndex: index, name: chart.axis_definitions.x })
-    yAxis.push({ type: "value", gridIndex: index, name: yName })
-    remember(playheads, index, index, chart.axis_definitions.x, yName)
-    for (const line of lines) {
-      series.push({
-        type: "line",
-        xAxisIndex: index,
-        yAxisIndex: index,
-        name: line.name,
-        showSymbol: false,
-        data: line.x.map((x, i) => [x, line.y[i]]),
+      lines.forEach((line, lineIndexOnAxis) => {
+        series.push(lineSeries(chart, line, lineIndex, lineIndexOnAxis, line.x.map((x, i) => [x, line.y[i]])))
       })
     }
+    return finish(withMap(grids, xAxis, yAxis, series, flat, chart, playheads), playheads, playhead, false)
   }
+
+  const groups = lineGroups(chart)
+  const panelCount = groups.length + (bars.length > 0 ? 1 : 0)
+  groups.forEach((group, groupIndex) => {
+    pushLines(
+      chart,
+      grids,
+      xAxis,
+      yAxis,
+      series,
+      playheads,
+      group,
+      gridBox(groupIndex, panelCount),
+      groupIndex === groups.length - 1,
+    )
+  })
   if (bars.length > 0) {
     const index = grids.length
-    grids.push({
-      left: 56,
-      right: 16,
-      top: lines.length > 0 ? "58%" : 28,
-      height: band,
-      bottom: 48,
-    })
+    grids.push(gridBox(groups.length, panelCount))
     xAxis.push({
       type: "category",
       gridIndex: index,
-      data: bars.map((bar) => bar.label),
-      axisLabel: { hideOverlap: true, rotate: bars.length > 6 ? 35 : 0 },
+      data: bars.map((bar) => formatCategoryLabel(bar.label)),
+      axisLabel: { ...TICK, rotate: bars.length > 6 ? 35 : 0, hideOverlap: true },
     })
-    yAxis.push({ type: "value", gridIndex: index, name: barAxisName(chart) })
+    yAxis.push({
+      type: "value",
+      gridIndex: index,
+      name: barAxisName(chart),
+      nameLocation: "middle",
+      nameGap: 56,
+      nameTextStyle: NAME,
+      min: chart.chart_kind === "T07" ? 0 : undefined,
+      max: chart.chart_kind === "T07" ? 1 : undefined,
+      axisLabel: {
+        ...TICK,
+        formatter: (value: number) => (chart.chart_kind === "T07" ? value.toFixed(2) : formatLevelTick(value, 30)),
+      },
+    })
     series.push({
       type: "bar",
       xAxisIndex: index,
       yAxisIndex: index,
       data: bars.map((bar) => bar.value),
-      itemStyle: { color: "#9a3412" },
+      itemStyle: { color: chart.evidence_class === "estimated" ? SERIES_ESTIMATED : SERIES_ENERGY },
     })
   }
-  attachMarkers(chart, series)
+  const switchResolution = switchesResolution(chart)
   return finish(
     {
       animation: false,
-      textStyle: { color: text },
-      color: [text, "#9a3412", "#1f4b99"],
-      legend: lines.length > 1 ? { top: 0, textStyle: { color: text } } : undefined,
+      backgroundColor: "transparent",
+      textStyle: { color: SERIES_INK, fontSize: 12 },
+      legend: legendFor(lines.length > 1 || switchResolution, switchResolution),
+      tooltip: tooltipFor(chart),
       grid: grids,
       xAxis,
       yAxis,
       series,
-      dataZoom: zoomIndexes(playheads),
+      dataZoom: zoomIndexes(playheads, chart),
     },
     playheads,
     playhead,
-    false,
+    switchResolution,
   )
 }
 
+function lineGroups(chart: ChartDocument): LineGroup[] {
+  const lines = chart.series.lines ?? []
+  if (lines.length === 0) {
+    return []
+  }
+  if (chart.chart_kind === "T05") {
+    return [
+      { lines: lines.filter((line) => line.unit === "ratio"), yName: "Correlation", yMin: -1, yMax: 1 },
+      { lines: lines.filter((line) => line.unit === "dB"), yName: "Side/mid (dB)" },
+    ].filter((group) => group.lines.length > 0)
+  }
+  if (chart.chart_kind === "T02") {
+    const dbfs = lines.filter((line) => line.unit === "dBFS")
+    const lufs = lines.filter((line) => line.unit === "LUFS")
+    const rest = lines.filter((line) => line.unit !== "dBFS" && line.unit !== "LUFS")
+    const groups: LineGroup[] = []
+    if (dbfs.length > 0) {
+      groups.push({ lines: dbfs, yName: "dBFS" })
+    }
+    if (lufs.length > 0) {
+      groups.push({ lines: lufs, yName: "LUFS" })
+    }
+    if (rest.length > 0) {
+      groups.push({ lines: rest, yName: lineAxisName(chart, rest) })
+    }
+    return groups
+  }
+  if (splitsLevels(chart)) {
+    return [
+      { lines: lines.filter((line) => line.unit === "amplitude"), yName: "Normalized amplitude" },
+      { lines: lines.filter((line) => line.unit === "dBFS"), yName: "dBFS" },
+    ].filter((group) => group.lines.length > 0)
+  }
+  return [
+    {
+      lines,
+      yName: lineAxisName(chart, lines),
+      xScale: chart.chart_kind === "T03" ? "log" : undefined,
+    },
+  ]
+}
+
 function withMap(
-  text: string,
   grid: echarts.GridComponentOption[],
   xAxis: echarts.XAXisComponentOption[],
   yAxis: echarts.YAXisComponentOption[],
@@ -330,22 +410,34 @@ function withMap(
   playheads: PlayheadAxis[],
 ): echarts.EChartsOption {
   attachMarkers(chart, series)
+  const low = Math.min(...flat)
+  const high = Math.max(...flat)
+  const unit = chart.chart_kind === "T09" ? "cosine" : "dB rel. median"
+  const digits = chart.chart_kind === "T09" ? 2 : 1
   return {
     animation: false,
-    textStyle: { color: text },
-    color: [text, "#9a3412", "#1f4b99"],
-    legend: series.filter((item) => item.type === "line").length > 1 ? { top: 0, textStyle: { color: text } } : undefined,
+    backgroundColor: "transparent",
+    textStyle: { color: SERIES_INK, fontSize: 12 },
+    legend: legendFor(series.filter((item) => item.type === "line").length > 1, false),
+    tooltip: tooltipFor(chart),
     grid,
     xAxis,
     yAxis,
     series,
-    dataZoom: zoomIndexes(playheads),
+    dataZoom: zoomIndexes(playheads, chart, chart.series.heatmap?.x),
     visualMap: {
-      show: false,
-      min: Math.min(...flat),
-      max: Math.max(...flat),
+      show: true,
+      min: low,
+      max: high,
       seriesIndex: 0,
-      inRange: { color: ["#1c2430", "#9a3412", "#e6e0d4"] },
+      calculable: false,
+      orient: "vertical",
+      right: 4,
+      top: 36,
+      bottom: 78,
+      text: [`${high.toFixed(digits)} ${unit}`, `${low.toFixed(digits)}`],
+      textStyle: { color: SERIES_INK, fontSize: 11 },
+      inRange: { color: [...HEATMAP_COLORS] },
     },
   }
 }
@@ -366,7 +458,8 @@ function markerLayer(chart: ChartDocument): echarts.MarkLineComponentOption | un
   return {
     symbol: "none",
     animation: false,
-    lineStyle: { color: "#c4a36a", type: "dashed" },
+    lineStyle: { color: SERIES_REVIEW, type: "dashed" },
+    label: { show: chart.review_markers.length <= 2, color: SERIES_INK, fontSize: 11 },
     data: chart.review_markers.map((marker) => ({ xAxis: marker.time_s, name: marker.label })),
   }
 }
@@ -383,25 +476,69 @@ function pushLines(
   yAxis: echarts.YAXisComponentOption[],
   series: echarts.SeriesOption[],
   playheads: PlayheadAxis[],
-  lines: NonNullable<ChartDocument["series"]["lines"]>,
-  name: string,
+  group: LineGroup,
   grid: echarts.GridComponentOption,
+  showXLabels: boolean,
 ) {
   const index = grids.length
   grids.push(grid)
-  xAxis.push({ type: "value", gridIndex: index, name: chart.axis_definitions.x })
-  yAxis.push({ type: "value", gridIndex: index, name })
-  remember(playheads, index, index, chart.axis_definitions.x, name)
+  const xName = chart.axis_definitions.x
+  if (group.xScale === "log") {
+    const positive = group.lines.flatMap((line) => line.x).filter((value) => value > 0)
+    xAxis.push({
+      type: "log",
+      logBase: 10,
+      gridIndex: index,
+      name: showXLabels ? xName : "",
+      nameLocation: "middle",
+      nameGap: 28,
+      nameTextStyle: NAME,
+      min: Math.min(...positive),
+      max: Math.max(...positive),
+      axisLabel: { ...TICK, show: showXLabels, formatter: (value: number) => formatFrequency(value) },
+    })
+  } else {
+    xAxis.push({
+      type: "value",
+      gridIndex: index,
+      name: showXLabels ? xName : "",
+      nameLocation: "middle",
+      nameGap: 28,
+      nameTextStyle: NAME,
+      axisLabel: {
+        ...TICK,
+        show: showXLabels,
+        formatter: fileTime(xName) ? (value: number) => formatFileTime(value) : undefined,
+      },
+    })
+  }
+  const span = spanOf(group.lines)
+  yAxis.push({
+    type: "value",
+    gridIndex: index,
+    name: group.yName,
+    nameLocation: "middle",
+    nameGap: 64,
+    nameTextStyle: NAME,
+    scale: chart.chart_kind === "T02" || undefined,
+    min: group.yMin,
+    max: group.yMax,
+    axisLabel: {
+      ...TICK,
+      formatter: (value: number) =>
+        group.yName === "Correlation" ? value.toFixed(1) : formatLevelTick(value, group.yName === "Normalized amplitude" ? 2 : span),
+    },
+  })
+  remember(playheads, index, index, xName, group.yName)
   const layer = markerLayer(chart)
-  lines.forEach((line, lineIndex) => {
-    const item: echarts.LineSeriesOption = {
-      type: "line",
-      xAxisIndex: index,
-      yAxisIndex: index,
-      name: line.name,
-      showSymbol: false,
-      data: line.x.map((x, i) => [x, line.y[i]]),
-    }
+  group.lines.forEach((line, lineIndex) => {
+    const item = lineSeries(
+      chart,
+      line,
+      index,
+      lineIndex,
+      line.x.map((x, i) => [x, line.y[i]]),
+    )
     if (lineIndex === 0 && layer) {
       item.markLine = layer
     }
@@ -409,14 +546,71 @@ function pushLines(
   })
 }
 
-function zoom(xIndex: number | number[], yIndex?: number | number[]): echarts.DataZoomComponentOption[] {
+function lineSeries(
+  chart: ChartDocument,
+  line: ChartLine,
+  axisIndex: number,
+  lineIndex: number,
+  data: [number, number | null][],
+): echarts.LineSeriesOption {
+  const paint = seriesPaint(line.unit, lineIndex, chart.evidence_class, chart.chart_kind)
+  return {
+    type: "line",
+    xAxisIndex: axisIndex,
+    yAxisIndex: axisIndex,
+    name: line.name,
+    showSymbol: false,
+    data,
+    lineStyle: { color: paint.color, width: 1.5, type: paint.dash },
+    itemStyle: { color: paint.color },
+  }
+}
+
+function gridBox(index: number, count: number): echarts.GridComponentOption {
+  const base = { left: 92, right: 16 }
+  if (count <= 1) {
+    return { ...base, top: 48, bottom: 96 }
+  }
+  if (count === 2) {
+    return index === 0 ? { ...base, top: 56, height: "30%" } : { ...base, top: "42%", bottom: 128 }
+  }
+  if (index === 0) {
+    return { ...base, top: 36, height: "20%" }
+  }
+  if (index === 1) {
+    return { ...base, top: "34%", height: "20%" }
+  }
+  return { ...base, top: "60%", bottom: 72 }
+}
+
+function zoom(
+  xIndex: number | number[],
+  yIndex: number | number[] | undefined,
+  mode: "time" | "time-category" | "frequency",
+  times?: number[],
+): echarts.DataZoomComponentOption[] {
+  const label = (value: number) => {
+    if (mode === "frequency") {
+      return formatFrequency(value)
+    }
+    if (mode === "time-category" && times) {
+      const time = times[Math.round(value)]
+      return time === undefined ? "" : formatFileTime(time)
+    }
+    return formatFileTime(value)
+  }
   const inside: echarts.DataZoomComponentOption = { type: "inside", xAxisIndex: xIndex, filterMode: "none" }
   const slider: echarts.DataZoomComponentOption = {
     type: "slider",
     xAxisIndex: xIndex,
     filterMode: "none",
-    height: 16,
-    bottom: 4,
+    height: 18,
+    bottom: 8,
+    labelFormatter: label,
+    textStyle: { color: SERIES_INK, fontSize: 11 },
+    borderColor: "#3a4150",
+    fillerColor: "rgba(142, 180, 212, 0.25)",
+    handleStyle: { color: SERIES_ENERGY },
   }
   if (yIndex !== undefined) {
     inside.yAxisIndex = yIndex
@@ -425,7 +619,14 @@ function zoom(xIndex: number | number[], yIndex?: number | number[]): echarts.Da
   return [inside, slider]
 }
 
-function zoomIndexes(playheads: PlayheadAxis[]): echarts.DataZoomComponentOption[] | undefined {
+function zoomIndexes(
+  playheads: PlayheadAxis[],
+  chart: ChartDocument,
+  categoryTimes?: number[],
+): echarts.DataZoomComponentOption[] | undefined {
+  if (chart.chart_kind === "T03") {
+    return zoom(0, undefined, "frequency")
+  }
   const xIndexes = [...new Set(playheads.filter((axis) => axis.x !== "off").map((axis) => axis.xAxisIndex))]
   const yIndexes = [...new Set(playheads.filter((axis) => axis.y !== "off").map((axis) => axis.yAxisIndex))]
   if (xIndexes.length === 0) {
@@ -433,7 +634,8 @@ function zoomIndexes(playheads: PlayheadAxis[]): echarts.DataZoomComponentOption
   }
   const x = xIndexes.length === 1 ? xIndexes[0] : xIndexes
   const y = yIndexes.length === 0 ? undefined : yIndexes.length === 1 ? yIndexes[0] : yIndexes
-  return zoom(x, y)
+  const category = playheads.some((axis) => axis.x === "category")
+  return zoom(x, y, category ? "time-category" : "time", categoryTimes)
 }
 
 function finish(
@@ -462,6 +664,7 @@ function finish(
       silent: true,
       showSymbol: false,
       tooltip: { show: false },
+      lineStyle: { color: SERIES_PLAYHEAD },
     }
     if (playhead !== null) {
       item.markLine = playheadMark(axis, playhead)
@@ -470,6 +673,94 @@ function finish(
   }
   option.series = series
   return { option, playheads, switchResolution }
+}
+
+function legendFor(show: boolean, switchResolution: boolean): echarts.LegendComponentOption | undefined {
+  if (!show) {
+    return undefined
+  }
+  const legend: echarts.LegendComponentOption = {
+    type: "scroll",
+    top: 0,
+    textStyle: { color: SERIES_INK, fontSize: 12 },
+    pageIconColor: SERIES_INK,
+    pageTextStyle: { color: SERIES_INK },
+  }
+  if (switchResolution) {
+    legend.selected = resolutionSelected(false)
+  }
+  return legend
+}
+
+function tooltipFor(chart: ChartDocument): echarts.TooltipComponentOption {
+  return {
+    trigger: "axis",
+    backgroundColor: PLOT_GROUND,
+    borderColor: "#3a4150",
+    textStyle: { color: SERIES_INK, fontSize: 12 },
+    formatter: (params: unknown) => tooltipText(chart, params),
+  }
+}
+
+function tooltipText(chart: ChartDocument, params: unknown): string {
+  const rows = (Array.isArray(params) ? params : [params]) as {
+    seriesName?: string
+    seriesId?: string
+    value?: unknown
+    axisValue?: unknown
+    axisValueLabel?: string
+  }[]
+  const lines = rows
+    .filter((row) => row.seriesName && !String(row.seriesId ?? "").startsWith("playback-playhead"))
+    .map((row) => formatTipRow(chart, row))
+    .filter((row) => row.length > 0)
+  return lines.join("<br/>")
+}
+
+function formatTipRow(
+  chart: ChartDocument,
+  row: { seriesName?: string; value?: unknown; axisValue?: unknown; axisValueLabel?: string },
+): string {
+  const heat = chart.series.heatmap
+  if (Array.isArray(row.value) && row.value.length >= 3 && heat) {
+    const x = heat.x[Number(row.value[0])]
+    const y = heat.y[Number(row.value[1])]
+    const z = Number(row.value[2])
+    const xText = fileTime(chart.axis_definitions.x) ? formatFileTime(x ?? 0) : formatFrequency(x ?? 0)
+    const yText = fileTime(chart.axis_definitions.y) ? formatFileTime(y ?? 0) : formatFrequency(y ?? 0)
+    const zText = chart.chart_kind === "T09" ? formatTooltipValue(z, "cosine similarity") : formatTooltipValue(z, "dB")
+    return escapeHtml(`Cell ${xText}, ${yText}: ${zText}`)
+  }
+  const named = (chart.series.lines ?? []).find((line) => line.name === row.seriesName)
+  if (named && Array.isArray(row.value)) {
+    const x = Number(row.value[0])
+    const y = row.value[1] === null || row.value[1] === undefined ? null : Number(row.value[1])
+    const xText = fileTime(chart.axis_definitions.x)
+      ? formatFileTime(x)
+      : chart.chart_kind === "T03"
+        ? formatFrequency(x)
+        : formatStored(x)
+    const yText = y === null ? "—" : formatTooltipValue(y, named.unit)
+    return escapeHtml(`${named.name}: ${yText} ${named.unit} at ${xText}`)
+  }
+  if (typeof row.value === "number") {
+    const label = formatCategoryLabel(String(row.axisValueLabel ?? row.axisValue ?? ""))
+    const unit = chart.chart_kind === "T07" ? "share" : chart.chart_kind === "T03" ? "%" : "dB"
+    return escapeHtml(`${label}: ${formatTooltipValue(row.value, unit)}`)
+  }
+  return ""
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>]/g, (char) => (char === "&" ? "&amp;" : char === "<" ? "&lt;" : "&gt;"))
+}
+
+function spanOf(lines: ChartLine[]): number {
+  const values = lines.flatMap((line) => line.y).filter((value): value is number => value !== null && Number.isFinite(value))
+  if (values.length === 0) {
+    return 0
+  }
+  return Math.max(...values) - Math.min(...values)
 }
 
 function remember(
@@ -515,7 +806,7 @@ function playheadMark(axis: PlayheadAxis, seconds: number): echarts.MarkLineComp
     symbol: "none",
     animation: false,
     silent: true,
-    lineStyle: { color: "#e6e0d4", width: 1.5, type: "solid" },
+    lineStyle: { color: SERIES_PLAYHEAD, width: 1.5, type: "solid" },
     label: { show: false },
     data,
   }
@@ -536,14 +827,6 @@ function nearestIndex(times: number[], seconds: number): number {
 
 function fileTime(label: string | undefined): boolean {
   return (label ?? "").toLowerCase().startsWith("time")
-}
-
-function timeLabels(times: number[]): string[] {
-  return times.map((time) => {
-    const tenth = time.toFixed(1)
-    const collision = times.some((other) => other !== time && other.toFixed(1) === tenth)
-    return collision ? time.toFixed(3) : tenth
-  })
 }
 
 function valueExtent(times: number[]): { min: number; max: number } | undefined {
@@ -574,7 +857,7 @@ function switchesResolution(chart: ChartDocument): boolean {
   return overview.x.length < detail.x.length
 }
 
-function lineAxisName(chart: ChartDocument, lines: NonNullable<ChartDocument["series"]["lines"]>): string {
+function lineAxisName(chart: ChartDocument, lines: ChartLine[]): string {
   const unit = lines[0]?.unit
   if (!unit || unit === "score") {
     return chart.axis_definitions.y || unit || ""
@@ -585,6 +868,9 @@ function lineAxisName(chart: ChartDocument, lines: NonNullable<ChartDocument["se
 function barAxisName(chart: ChartDocument): string {
   if (chart.chart_kind === "T06") {
     return "Autocorrelation"
+  }
+  if (chart.chart_kind === "T07") {
+    return "Share"
   }
   return chart.axis_definitions.y || ""
 }

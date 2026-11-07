@@ -1,6 +1,29 @@
 # Studio Precision Pass 3 — readiness report
 
-Proposal only. See [NEXT_SESSION.md](../../NEXT_SESSION.md) for the current authorization boundary. This report supplies no approval to implement Pass 3, start M2-C, or change analysis version `m1-v3`.
+## Acceptance
+
+On November 7, 2026, the owner accepted Studio Precision Pass 3, Option B. The same-day implementation instruction authorized the work. This section records the later acceptance. Scope: coordinated ECharts and Matplotlib presentation, in-page chart data tables, and `png-r1` regeneration from stored chart JSON. `m1-v3` is unchanged. Milestone 2-C is not authorized.
+
+Accepted limitations: native keyboard activation of the data-table controls was not manually verified. Legacy PNGs are unavailable on the current image route until refresh. G3, G4, and G6 stay open, including the stored T03 `dB` unit, chart zoom that is independent of the waveform, and omitted mixed line/bar PNG panels.
+
+## Authorization
+
+On November 7, 2026, the owner authorized implementation of Option B. Included: coordinated ECharts and Matplotlib presentation, bounded in-page accessible chart tables, and safe cached PNG regeneration from canonical chart JSON. `m1-v3` stays unchanged. That authorization is historical. Acceptance is recorded above. It does not authorize Milestone 2-C.
+
+The sections below are the readiness proposal. Where they defer PNG parity or omit accessible tables, Option B supersedes that deferral for the approved axis, unit, scale, table, and regeneration work. The omission of mixed line/bar panels from some PNGs stays a tracked renderer gap unless an authorized fix requires one panel. G3, G4, and G6 are not marked resolved here.
+
+Proposal history follows. The original report supplied no approval by itself.
+
+## Implementation results
+
+Shipped in the accepted Pass 3 closeout. The readiness proposal below is historical and is not a second approval.
+
+- Shared display formatting is in `frontend/src/chart-format.ts`. Formatting does not write back onto chart documents. Seek and marker positions stay raw seconds.
+- T02 and T05 use separate numeric grids in ECharts and Matplotlib. T03 displays the stored positive-Hz series on a log frequency axis in both renderers. Stored `y_scale` stays `linear` and the stored unit stays `dB`. T04 stays a linear heatmap. Its PNG band traces use a second axes. T07 shares stay on 0–1.
+- Heatmap low stop is `#4c6680`. The proposed `#243044` was about 1.35:1 against `#14171c` and was not used. Brass stays the review accent.
+- Each ready chart has an in-page Data table. Large series page 16 rows at a time. Heatmap cells keep stored time, frequency, and value. Non-ready charts name the status and do not invent numbers.
+- Renderer version is `png-r1`. `python -m app.refresh_png` reads canonical chart JSON, writes a temporary PNG, checks the signature, and publishes with `os.replace`. A failed publish leaves the previous PNG. Dry-run writes nothing. Startup does not refresh.
+- Deviation: mixed line/bar PNG panels are still omitted for T02, T03, and T06. T04 linear PNG frequency labels drop ticks closer than 12% of the hertz span so labels do not collide. Ticks use scientific notation only when both the value and the span are under 0.001. A zero tick stays `0`. T02 line axes do not force a zero baseline.
 
 This report audits the chart renderer in `frontend/src/chart.tsx`, the workspace in `frontend/src/analyzer.tsx` and `frontend/src/styles.css`, the chart documents built by `backend/app/charts.py`, and two existing local `m1-v3` chart documents. One document set is a long stereo file with Nyquist at 24 kHz. The other is a short stereo file with Nyquist at 4 kHz. No private audio, titles, or lyric text are included. This session did not retake screenshots.
 

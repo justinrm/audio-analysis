@@ -10,7 +10,8 @@ React 19 and TypeScript. Product contract: `docs/01_TECHNICAL_MVP_SPEC.md` and `
 
 - Accessible controls, visible focus, and a layout that stacks on a narrow viewport.
 - WaveSurfer plays the streamed playback URL plus `playback_minmax_envelope_v1` peaks. That preview is not chart T01.
-- Render charts from the API chart document with ECharts. Do not compute loudness, spectra, or peaks in the browser. Use the document's units, axis scale, and time values. Seek only when the x-axis is time.
+- Render charts from the API chart document with ECharts. Do not compute loudness, spectra, or peaks in the browser. Use the document's units and time values. Seek only when the x-axis is time.
+- T03 is the presentation exception. Stored `y_scale` stays `linear` and the Welch unit stays `dB`. The browser and the PNG renderer show the existing positive-Hz samples on a logarithmic frequency axis. That display adds no spectral samples and does not relabel the unit as dB/Hz. Frequency interaction does not seek.
 - Show chart `status` (`not_run`, `ready`, `not_available`, `failed`) as that status. Show `evidence_class` separately. Do not turn one into the other.
 - Import API shapes from generated OpenAPI types in `frontend/src/api/`. Do not hand-maintain a second copy.
 - The lyrics workspace edits an attached TXT, Markdown, or SRT file. It does not time lyrics from the audio or draw L01–L05. Album QC stays an empty state until comparison exists. Do not invent series, peaks, progress, or metrics.
