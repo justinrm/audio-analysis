@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import WaveSurfer from "wavesurfer.js"
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js"
 import { api, streamUrl } from "./api/client"
-import type { Asset, ChartDocument, ChartSummary, Job, Peaks } from "./api/types"
+import type { Asset, ChartDocument, ChartSummary, ExportCreate, Job, LyricDocumentOut, Peaks } from "./api/types"
 import { ChartView } from "./chart"
 import { ChartDataTable } from "./chart-data-table"
 import { clock, evidenceLabel, formatLabel, playbackCaption, statusLabel, TECHNICAL, toWavePeaks } from "./catalog"
@@ -400,6 +400,21 @@ function Transport({
   )
 }
 
+function exportName(profile: ExportCreate["profile"]): string {
+  switch (profile) {
+    case "technical":
+      return "Technical"
+    case "lyricist":
+      return "Lyricist"
+    case "combined":
+      return "Combined"
+    default: {
+      const unexpected: never = profile
+      return unexpected
+    }
+  }
+}
+
 export function Analyzer({ assetId, projectId = null }: { assetId: string; projectId?: string | null }) {
   const [asset, setAsset] = useState<Asset | null>(null)
   const [peaks, setPeaks] = useState<Peaks | null>(null)
@@ -420,6 +435,15 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
     commit() {},
     pick() {},
   })
+  const lyricEpoch = useRef(0)
+  const [lyricDocument, setLyricDocument] = useState<LyricDocumentOut | null>(null)
+  const [lyricMode, setLyricMode] = useState<"summarized" | "included" | "omitted">("summarized")
+  const [exportState, setExportState] = useState<
+    | { kind: "idle" }
+    | { kind: "loading"; profile: ExportCreate["profile"] }
+    | { kind: "done"; profile: ExportCreate["profile"] }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" })
   const onCues = useCallback((next: LyricCue[]) => {
     setCues((prev) => (cueKey(prev) === cueKey(next) ? prev : next))
   }, [])
@@ -440,6 +464,8 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
     setPlayhead(null)
     setCues([])
     setActiveCueId(null)
+    setLyricDocument(null)
+    setExportState({ kind: "idle" })
     api
       .asset(assetId)
       .then(async (next) => {
@@ -470,6 +496,33 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
       cancelled = true
     }
   }, [assetId])
+
+  useEffect(() => {
+    if (!projectId || typeof api.lyrics !== "function") {
+      return
+    }
+    const epoch = ++lyricEpoch.current
+    api
+      .lyrics(projectId, assetId)
+      .then((document) => {
+        if (epoch === lyricEpoch.current) {
+          setLyricDocument(document)
+        }
+      })
+      .catch(() => {
+        if (epoch === lyricEpoch.current) {
+          setLyricDocument(null)
+        }
+      })
+    return () => {
+      lyricEpoch.current += 1
+    }
+  }, [projectId, assetId])
+
+  const onLyricDocument = useCallback((document: LyricDocumentOut | null) => {
+    lyricEpoch.current += 1
+    setLyricDocument(document)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -524,6 +577,26 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
       .catch(() => undefined)
   }, [assetId, job?.status])
 
+  async function onExport(profile: ExportCreate["profile"]) {
+    if (!projectId) {
+      return
+    }
+    if ((profile === "lyricist" || profile === "combined") && !lyricDocument) {
+      return
+    }
+    setExportState({ kind: "loading", profile })
+    try {
+      const manifest = await api.createExport(projectId, assetId, { profile, lyrics: lyricMode })
+      await api.downloadExport(projectId, assetId, manifest.export_id, `${profile}-${manifest.export_id}.zip`)
+      setExportState({ kind: "done", profile })
+    } catch (error) {
+      setExportState({
+        kind: "error",
+        message: error instanceof Error ? error.message : "The export was not created.",
+      })
+    }
+  }
+
   async function onAnalyze() {
     setNotice("")
     try {
@@ -572,6 +645,69 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
                 Analyze
               </button>
             </div>
+            <div className="export-bar">
+              <label>
+                Lyric text
+                <select
+                  aria-label="Lyric text in export"
+                  value={lyricMode}
+                  disabled={!projectId || exportState.kind === "loading"}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    if (value === "summarized" || value === "included" || value === "omitted") {
+                      setLyricMode(value)
+                    }
+                  }}
+                >
+                  <option value="summarized">Summarized</option>
+                  <option value="included">Included</option>
+                  <option value="omitted">Omitted</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                className="action"
+                disabled={!projectId || exportState.kind === "loading"}
+                onClick={() => void onExport("technical")}
+              >
+                Export Technical ZIP
+              </button>
+              <button
+                type="button"
+                className="action"
+                disabled={!projectId || !lyricDocument || exportState.kind === "loading"}
+                onClick={() => void onExport("lyricist")}
+              >
+                Export Lyricist ZIP
+              </button>
+              <button
+                type="button"
+                className="action"
+                disabled={!projectId || !lyricDocument || exportState.kind === "loading"}
+                onClick={() => void onExport("combined")}
+              >
+                Export Combined ZIP
+              </button>
+            </div>
+            {!projectId ? <p className="quiet">Open this recording from a study to export.</p> : null}
+            {projectId && !lyricDocument ? (
+              <p className="quiet">Attach a lyric document to export a Lyricist or Combined package.</p>
+            ) : null}
+            {exportState.kind === "loading" ? (
+              <p className="feedback" role="status">
+                Preparing the {exportName(exportState.profile)} ZIP.
+              </p>
+            ) : null}
+            {exportState.kind === "done" ? (
+              <p className="feedback" role="status">
+                {exportName(exportState.profile)} ZIP downloaded.
+              </p>
+            ) : null}
+            {exportState.kind === "error" ? (
+              <p className="feedback is-alert" role="alert">
+                {exportState.message}
+              </p>
+            ) : null}
             {asset.playback_status === "unavailable" ? <p className="quiet">{playbackCaption(asset)}</p> : null}
             {peaks ? (
               <Transport
@@ -615,6 +751,7 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
                 onActive={onActive}
                 bridge={lyricBridge}
                 onRegionReset={() => setRegionNonce((count) => count + 1)}
+                onDocument={onLyricDocument}
               />
             }
           />

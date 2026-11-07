@@ -1,6 +1,6 @@
 # Milestone 3 export scope
 
-> **Authorization proposal.** This document does not authorize implementation. [PROJECT_STATUS.md](../../../PROJECT_STATUS.md) owns acceptance. [NEXT_SESSION.md](../../../NEXT_SESSION.md) owns the current handoff. The owner must name the slice before any export code is written.
+> **Implementation reference.** On November 7, 2026, the owner accepted M3-A and M3-B. Milestone 3 overall remains open. [PROJECT_STATUS.md](../../../PROJECT_STATUS.md) owns acceptance. [NEXT_SESSION.md](../../../NEXT_SESSION.md) owns the current handoff. The narrative client is not authorized.
 
 **Goal:** Produce a per-recording Technical ZIP from stored `m1-v3` evidence, then a Lyricist ZIP and a Combined ZIP from that same evidence plus the current lyric document, without a network client.
 

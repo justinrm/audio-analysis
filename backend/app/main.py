@@ -29,6 +29,7 @@ from app.audio import (
 from app.charts import KINDS, not_run
 from app.config import Settings, load_settings
 from app.db import asset_dict, connect, project_dict
+from app.exports import ExportError, create_export, open_export
 from app.lyric_charts import (
     LYRIC_KINDS,
     build_lyric_chart,
@@ -376,6 +377,32 @@ class LyricSeries(BaseModel):
     lines: list[LyricSeriesLine] = []
     bars: list[LyricSeriesBar] = []
     heatmap: ChartHeatmap | None = None
+
+
+class ExportCreate(BaseModel):
+    profile: Literal["technical", "lyricist", "combined"]
+    lyrics: Literal["summarized", "included", "omitted"] = "summarized"
+
+
+class ExportManifest(BaseModel):
+    export_id: str
+    project_id: str
+    asset_id: str
+    profile: Literal["technical", "lyricist", "combined"]
+    lyrics_mode: Literal["summarized", "included", "omitted"]
+    narrative: Literal["none"]
+    source_sha256: str
+    algorithm_version: str | None
+    params_hash: str | None
+    renderer_version: Literal["png-r1"]
+    lyric_renderer_version: Literal["lyric-png-v1"] | None
+    lyric_document_id: str | None
+    lyric_revision: int | None
+    lyric_source_sha256: str | None
+    content_sha256: str
+    created_at: str
+    png_unavailable: list[str]
+    files: list[str]
 
 
 class LyricChartDocument(BaseModel):
@@ -1010,5 +1037,42 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise AppError(404, "not_found", "Unknown chart.")
         bundle, charts, document = _lyric_inputs(project_id, asset_id)
         return build_lyric_chart(kind, bundle, charts, document)
+
+    @app.post(
+        "/api/projects/{project_id}/assets/{asset_id}/exports",
+        response_model=ExportManifest,
+    )
+    def create_recording_export(project_id: str, asset_id: str, body: ExportCreate) -> dict:
+        try:
+            return create_export(
+                connection,
+                settings.data_root,
+                project_id,
+                asset_id,
+                body.profile,
+                body.lyrics,
+            )
+        except LyricError as exc:
+            raise _lyric(exc) from exc
+        except ExportError as exc:
+            raise AppError(exc.status, exc.code, exc.message) from exc
+
+    @app.get("/api/projects/{project_id}/assets/{asset_id}/exports/{export_id}")
+    def download_recording_export(
+        project_id: str, asset_id: str, export_id: str
+    ) -> FileResponse:
+        try:
+            path, profile = open_export(
+                connection, settings.data_root, project_id, asset_id, export_id
+            )
+        except LyricError as exc:
+            raise _lyric(exc) from exc
+        except ExportError as exc:
+            raise AppError(exc.status, exc.code, exc.message) from exc
+        return FileResponse(
+            path,
+            media_type="application/zip",
+            filename=f"{profile}-{export_id}.zip",
+        )
 
     return app

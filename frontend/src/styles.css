@@ -136,6 +136,22 @@ textarea {
   align-items: baseline;
 }
 
+.export-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: end;
+  margin-top: 0.75rem;
+}
+
+.export-bar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  color: var(--color-secondary);
+  font-size: 0.85rem;
+}
+
 .study-frame {
   flex: 1;
   min-height: 0;

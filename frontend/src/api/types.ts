@@ -130,6 +130,32 @@ export type EvidenceRef = {
   persisted: boolean;
 }
 
+export type ExportCreate = {
+  profile: "technical" | "lyricist" | "combined";
+  lyrics?: "summarized" | "included" | "omitted";
+}
+
+export type ExportManifest = {
+  export_id: string;
+  project_id: string;
+  asset_id: string;
+  profile: "technical" | "lyricist" | "combined";
+  lyrics_mode: "summarized" | "included" | "omitted";
+  narrative: "none";
+  source_sha256: string;
+  algorithm_version: string | null;
+  params_hash: string | null;
+  renderer_version: "png-r1";
+  lyric_renderer_version: "lyric-png-v1" | null;
+  lyric_document_id: string | null;
+  lyric_revision: number | null;
+  lyric_source_sha256: string | null;
+  content_sha256: string;
+  created_at: string;
+  png_unavailable: Array<string>;
+  files: Array<string>;
+}
+
 export type HTTPValidationError = {
   detail?: Array<ValidationError>;
 }

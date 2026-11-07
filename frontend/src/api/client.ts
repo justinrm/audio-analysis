@@ -9,6 +9,8 @@ import type {
   LyricChartDocument,
   LyricDocumentOut,
   LyricSegmentUpdate,
+  ExportCreate,
+  ExportManifest,
   LyricVerify,
   Peaks,
   Project,
@@ -134,4 +136,26 @@ export const api = {
     fetch(`${lyricPath(projectId, assetId)}/lyric-charts`).then(parse<ChartList>),
   lyricChart: (projectId: string, assetId: string, kind: string) =>
     fetch(`${lyricPath(projectId, assetId)}/lyric-charts/${kind}/data`).then(parse<LyricChartDocument>),
+  createExport: (projectId: string, assetId: string, body: ExportCreate) =>
+    fetch(`${lyricPath(projectId, assetId)}/exports`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(parse<ExportManifest>),
+  downloadExport: async (projectId: string, assetId: string, exportId: string, filename: string) => {
+    const response = await fetch(`${lyricPath(projectId, assetId)}/exports/${exportId}`)
+    if (!response.ok) {
+      await parse(response)
+      return
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  },
 }

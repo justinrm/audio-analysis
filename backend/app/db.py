@@ -95,6 +95,11 @@ def connect(database: Path) -> sqlite3.Connection:
         conn.executescript((MIGRATIONS / "003_lyrics.sql").read_text())
         conn.execute("PRAGMA user_version = 3")
         conn.commit()
+        version = 3
+    if version < 4:
+        conn.executescript((MIGRATIONS / "004_exports.sql").read_text())
+        conn.execute("PRAGMA user_version = 4")
+        conn.commit()
     return conn
 
 

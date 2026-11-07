@@ -345,6 +345,7 @@ export function LyricsWorkspace({
   onActive,
   bridge,
   onRegionReset,
+  onDocument,
 }: {
   projectId: string | null
   assetId: string
@@ -355,6 +356,7 @@ export function LyricsWorkspace({
   onActive: (id: string | null) => void
   bridge: { current: LyricBridge }
   onRegionReset: () => void
+  onDocument?: (document: LyricDocumentOut | null) => void
 }) {
   const [project, setProject] = useState<string | null>(projectId)
   const [document, setDocument] = useState<LyricDocumentOut | null>(null)
@@ -391,6 +393,7 @@ export function LyricsWorkspace({
     const saved = latest.segments.find((item) => item.id === pending.id)
     docRef.current = latest
     setDocument(latest)
+    onDocument?.(latest)
     setConflict({ segmentId: pending.id, server: latest })
     const textEdited = draft != null && (pending.textEdited || draft.text !== pending.text)
     const timesEdited = draft != null && (pending.timesEdited || timingChanged(pending, draft))
@@ -463,6 +466,7 @@ export function LyricsWorkspace({
         }
         docRef.current = lyricDocument
         setDocument(lyricDocument)
+        onDocument?.(lyricDocument)
         setNotes(annotations)
         setStatus("")
       } catch (error) {
@@ -613,6 +617,7 @@ export function LyricsWorkspace({
       }
       docRef.current = next
       setDocument(next)
+      onDocument?.(next)
       setDrafts((prev) => {
         const existing = prev[id]
         const saved = next.segments.find((item) => item.id === id)
@@ -767,6 +772,7 @@ export function LyricsWorkspace({
       }
       docRef.current = next
       setDocument(next)
+      onDocument?.(next)
       setConflict(null)
       setStatus("Artist confirmation saved.")
     } catch (error) {
@@ -807,6 +813,7 @@ export function LyricsWorkspace({
       }
       docRef.current = next
       setDocument(next)
+      onDocument?.(next)
       setDrafts({})
       setConflict(null)
       setSelected(null)
