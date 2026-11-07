@@ -111,7 +111,8 @@ export function ChartView({
   }
   const lines = chart.series.lines?.length ?? 0
   const bars = chart.series.bars?.length ?? 0
-  const stacked = (lines > 0 && (bars > 0 || chart.series.heatmap != null)) || splitsLevels(chart)
+  const heat = (chart.series.heatmap?.z.length ?? 0) > 0
+  const stacked = (lines > 0 && (bars > 0 || heat)) || splitsLevels(chart) || heat
   return (
     <>
       <div ref={node} className={stacked ? "chart stacked" : "chart"} role="img" aria-label={chart.title} />
@@ -165,7 +166,14 @@ function optionFor(chart: ChartDocument, ink: string, playhead: number | null): 
     const index = grids.length
     const flat = heat.z.flat()
     const yIsTime = fileTime(chart.axis_definitions.y)
-    grids.push({ left: 56, right: 16, top: 28, height: band, bottom: band ? undefined : 36 })
+    const legendRoom = lines.length > 1 ? 64 : 28
+    grids.push({
+      left: yIsTime ? 56 : 72,
+      right: 16,
+      top: legendRoom,
+      height: band,
+      bottom: band ? undefined : 52,
+    })
     xAxis.push({
       type: "category",
       gridIndex: index,
@@ -177,6 +185,7 @@ function optionFor(chart: ChartDocument, ink: string, playhead: number | null): 
       gridIndex: index,
       name: chart.axis_definitions.y,
       data: yIsTime ? timeLabels(heat.y) : heat.y.map((hz) => String(Math.round(hz))),
+      axisLabel: { hideOverlap: true },
     })
     remember(playheads, index, index, chart.axis_definitions.x, chart.axis_definitions.y, heat.x, yIsTime ? heat.y : undefined)
     series.push({
@@ -188,7 +197,7 @@ function optionFor(chart: ChartDocument, ink: string, playhead: number | null): 
     if (lines.length > 0) {
       const lineIndex = grids.length
       const extent = valueExtent(heat.x)
-      grids.push({ left: 56, right: 16, top: "58%", bottom: 36 })
+      grids.push({ left: 72, right: 16, top: "58%", bottom: 48 })
       xAxis.push({
         type: "value",
         gridIndex: lineIndex,
@@ -217,14 +226,14 @@ function optionFor(chart: ChartDocument, ink: string, playhead: number | null): 
     pushLines(chart, grids, xAxis, yAxis, series, playheads, amplitude, "Normalized amplitude", {
       left: 64,
       right: 16,
-      top: 32,
-      height: "34%",
+      top: 64,
+      height: "28%",
     })
     pushLines(chart, grids, xAxis, yAxis, series, playheads, levels, "dBFS", {
       left: 64,
       right: 16,
-      top: "52%",
-      height: "30%",
+      top: "58%",
+      height: "24%",
     })
     const legend: echarts.LegendComponentOption = { top: 0, textStyle: { color: text } }
     const switchResolution = switchesResolution(chart)

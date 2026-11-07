@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import type { ChartDocument, ChartSummary } from "./api/types"
 import { TechnicalBoard } from "./analyzer"
-import { playbackCaption, statusLabel, TECHNICAL } from "./catalog"
+import { playbackCaption, plotBudget, statusLabel, TECHNICAL, workspaceMode } from "./catalog"
 
 vi.mock("echarts", () => ({
   init: () => ({
@@ -27,9 +27,6 @@ const idle = {
   charts: [] as ChartSummary[],
   chartId: "T01",
   document: null as ChartDocument | null,
-  jobStatus: "",
-  notice: "",
-  onAnalyze: () => undefined,
   onSelect: () => undefined,
   onSeek: () => undefined,
 }
@@ -127,6 +124,43 @@ describe("milestone 1 analysis state", () => {
     expect(seen).toEqual([1.25])
     fireEvent.click(screen.getByRole("button", { name: /T03/i }))
     expect(seen).toEqual([1.25, "T03"])
+  })
+
+  it("says a ready chart is loading until its document arrives", () => {
+    const charts: ChartSummary[] = [
+      {
+        chart_kind: "T01",
+        status: "ready",
+        title: "Waveform and peak envelope",
+        evidence_class: "measured",
+        method_id: "frame",
+        method_version: "m1-v3",
+        caveats: [],
+        summary: [],
+        data_url: "/api/assets/a/charts/T01/data",
+        png_url: null,
+      },
+    ]
+    render(<TechnicalBoard {...idle} charts={charts} chartId="T01" document={null} />)
+    expect(screen.getByText("Loading this chart.")).toBeTruthy()
+    expect(screen.getByText(/still loading/i)).toBeTruthy()
+    expect(screen.queryByText(/No evidence yet/i)).toBeNull()
+  })
+
+  it("keeps the plot at least 720px beside a list from 1100px up", () => {
+    expect(workspaceMode(1440)).toBe("wide")
+    expect(workspaceMode(1280)).toBe("list-side")
+    expect(workspaceMode(1000)).toBe("stacked")
+    expect(workspaceMode(390)).toBe("phone")
+    expect(plotBudget(1440)).toBe(828)
+    expect(plotBudget(1280)).toBe(900)
+    expect(plotBudget(1100)).toBe(720)
+    expect(plotBudget(1099)).toBe(891)
+    expect(plotBudget(1000)).toBe(792)
+    expect(plotBudget(928)).toBe(720)
+    expect(plotBudget(927)).toBe(895)
+    expect(plotBudget(390)).toBe(358)
+    expect(plotBudget(1332)).toBe(720)
   })
 
   it("labels job and playback status without rewriting evidence class", () => {

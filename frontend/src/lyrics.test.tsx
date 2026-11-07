@@ -763,7 +763,7 @@ describe("lyric workspace", () => {
       "a",
       expect.objectContaining({ text: "bridge", segment_id: "s", start_s: 1, end_s: 2 }),
     )
-    fireEvent.click(screen.getByRole("button", { name: "Delete note note-1" }))
+    fireEvent.click(screen.getByRole("button", { name: "Delete note: kept from before" }))
     await waitFor(() => expect(screen.queryByText(/kept from before/)).toBeNull())
     expect(api.deleteAnnotation).toHaveBeenCalledWith("p", "a", "note-1")
     expect(seen).toEqual([1])
@@ -826,14 +826,62 @@ describe("lyric workspace", () => {
     expect(api.verifySegment).not.toHaveBeenCalled()
   })
 
+  it("keeps one editor and an unsaved draft across line changes", async () => {
+    api.lyrics.mockResolvedValue(
+      document({
+        segments: [
+          segment({ id: "s1", text: "one", ordinal: 0 }),
+          segment({ id: "s2", text: "two", ordinal: 1 }),
+        ],
+      }),
+    )
+    workspace()
+    const first = await screen.findByLabelText("Text for Line 1")
+    expect(screen.getAllByRole("textbox", { name: /Text for/ })).toHaveLength(1)
+    fireEvent.change(first, { target: { value: "one edited" } })
+    fireEvent.click(screen.getByRole("button", { name: /Line 2/ }))
+    expect(screen.getByLabelText("Text for Line 2")).toBeTruthy()
+    expect(screen.queryByLabelText("Text for Line 1")).toBeNull()
+    expect(screen.getByText("Unsaved")).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: /Line 1/ }))
+    expect((screen.getByLabelText("Text for Line 1") as HTMLTextAreaElement).value).toBe("one edited")
+    expect(api.updateSegment).not.toHaveBeenCalled()
+  })
+
+  it("scrolls a long document as a line list with one editor", async () => {
+    api.lyrics.mockResolvedValue(
+      document({
+        segments: Array.from({ length: 100 }, (_, ordinal) =>
+          segment({ id: `s${ordinal}`, text: `line ${ordinal}`, ordinal }),
+        ),
+      }),
+    )
+    workspace()
+    expect(await screen.findByLabelText("Text for Line 1")).toBeTruthy()
+    expect(screen.getAllByRole("button", { name: /Unplaced/ })).toHaveLength(100)
+    expect(screen.getAllByRole("textbox", { name: /Text for/ })).toHaveLength(1)
+    fireEvent.click(screen.getByRole("button", { name: /^Line 100/ }))
+    expect(screen.getByLabelText("Text for Line 100")).toBeTruthy()
+    expect(screen.queryByLabelText("Text for Line 1")).toBeNull()
+  })
+
   it("keeps one player when the study tab changes", async () => {
+    api.lyrics.mockResolvedValue(document({ segments: [segment({ id: "s", text: "keep", ordinal: 0 })] }))
     render(<Analyzer assetId="a" projectId="p" />)
     await screen.findByRole("button", { name: "Play" })
     await waitFor(() => expect(bus.created).toEqual([1]))
     fireEvent.click(screen.getByRole("tab", { name: "Lyrics & Inspiration" }))
-    await screen.findByLabelText("Lyric file")
+    const line = await screen.findByLabelText("Text for Line 1")
+    fireEvent.change(line, { target: { value: "unsaved line" } })
     fireEvent.click(screen.getByRole("tab", { name: "Technical Analysis" }))
     await screen.findByRole("button", { name: "Play" })
+    expect(line.closest("[hidden]")).toBeTruthy()
+    expect(line.closest("[inert]")).toBeTruthy()
+    expect(screen.queryByRole("textbox", { name: "Text for Line 1" })).toBeNull()
+    line.focus()
+    expect(globalThis.document.activeElement).not.toBe(line)
+    fireEvent.click(screen.getByRole("tab", { name: "Lyrics & Inspiration" }))
+    expect((screen.getByLabelText("Text for Line 1") as HTMLTextAreaElement).value).toBe("unsaved line")
     expect(bus.created).toEqual([1])
   })
 
@@ -928,9 +976,9 @@ describe("lyric workspace", () => {
     expect(await screen.findByText("Cue 1 · Playing")).toBeTruthy()
     bus.emit("region-clicked", { id: "s2", start: 1, end: 3 } as never, { stopPropagation() {} } as never)
     await waitFor(() => {
-      expect(screen.getByText("Cue 2").closest("form")?.getAttribute("aria-current")).toBe("true")
+      expect(screen.getByRole("button", { name: /second/ }).getAttribute("aria-current")).toBe("true")
     })
-    expect(screen.getByText("Cue 1 · Playing").closest("form")?.getAttribute("data-playing")).toBe("true")
+    expect(screen.getByRole("button", { name: /first/ }).getAttribute("data-playing")).toBe("true")
     expect(bus.added.map((region) => region.id)).toEqual(["s1", "s2"])
     expect(bus.setTime).toHaveBeenCalledTimes(1)
     expect(bus.setTime).toHaveBeenCalledWith(1)

@@ -83,3 +83,48 @@ export function formatLabel(asset: Pick<Asset, "subtype" | "sample_rate" | "chan
   const channels = asset.channels === 1 ? "mono" : asset.channels === 2 ? "stereo" : `${asset.channels} ch`
   return `${bits}, ${rate}, ${channels}`
 }
+
+const EVIDENCE_LABEL: Record<string, string> = {
+  measured: "Measured",
+  estimated: "Estimated",
+  textual: "Textual",
+  interpretive: "Interpretive",
+  unknown: "Unknown",
+  not_applicable: "Not applicable",
+}
+
+/** Display word for an evidence class. This is not a status. */
+export function evidenceLabel(value: string): string {
+  return EVIDENCE_LABEL[value] ?? value
+}
+
+/** Viewport modes from docs/design/studio-precision.md. Widths are CSS pixels. */
+export function workspaceMode(viewportWidth: number): "wide" | "list-side" | "stacked" | "phone" {
+  if (viewportWidth >= 1332) {
+    return "wide"
+  }
+  if (viewportWidth >= 1100) {
+    return "list-side"
+  }
+  if (viewportWidth >= 928) {
+    return "stacked"
+  }
+  return "phone"
+}
+
+/**
+ * Usable plot width after the rail, 16px stage padding on each side, the list,
+ * the inspector, and 12px gaps. Assumes a 16px root, matching styles.css.
+ */
+export function plotBudget(viewportWidth: number): number {
+  const mode = workspaceMode(viewportWidth)
+  const rail = mode === "phone" ? 0 : 176
+  const inner = viewportWidth - rail - 32
+  if (mode === "wide") {
+    return inner - 160 - 220 - 24
+  }
+  if (mode === "list-side") {
+    return inner - 160 - 12
+  }
+  return inner
+}

@@ -12,7 +12,11 @@ M2-A is accepted by the owner on 2026-10-14 at `4d1e71b`. M2-B, the lyrics works
 - Lyric `.txt`, `.md`, and `.srt` files are stored, edited, timed by hand, and drawn as waveform regions when the interval is usable. SRT times are the subtitle file’s times. A stale revision returns 409 and does not overwrite the newer text.
 - Notes are annotations. Lyric edits do not rewrite `analysis/{sha256}/m1-v3/`.
 - L01–L05 are not implemented. Album QC is an empty state. Settings leave AI interpretation off.
-- Studio Precision Pass 1 (shell, language, and library) is accepted by the owner on 2026-11-06. Pass 2 and Pass 3 are not started. The Pass 2 plot-width rule is in `docs/design/studio-precision.md` and is not implemented.
+- Studio Precision Pass 1 (shell, language, and library) is accepted by the owner on 2026-11-06. Pass 2 (persistent transport, chart workspace, one lyric editor) is accepted by the owner on 2026-11-06. Pass 3 is not started and is not authorized. The width rule and the Pass 2 record are in `docs/design/studio-precision.md`.
+
+## Next
+
+Plan Studio Precision Pass 3: technical-chart presentation only. Do not implement it, change `m1-v3`, or start M2-C unless the owner asks. Pass 3 candidates and the separate bundle, playback, and empty-analyzer notes are listed in `docs/design/studio-precision.md`.
 
 ## Commands
 
@@ -34,6 +38,14 @@ Open `http://127.0.0.1:5173/`. Without the worker, a new analysis stays `queued`
 `ARS_DATA_ROOT` is the API storage directory. Unset or empty uses `~/Library/Application Support/AudioReferenceStudio`. `ARS_API_ORIGIN` is only the Vite dev proxy for `/api`, read from the shell when `frontend/vite.config.ts` loads. Default `http://127.0.0.1:8000`.
 
 ## Checks last run
+
+6 Nov 2026, Pass 2 checkpoint, from `frontend/`:
+
+- `pnpm typecheck` passed.
+- `pnpm test`: 5 files, 40 tests passed.
+- `pnpm build` passed. The main JS chunk is 1,460.36 kB. Vite warned that it is over 500 kB. That warning is not a Pass 2 failure.
+- Backend tests were not rerun. No backend source files changed.
+- The owner’s browser review passed playback continuity, lyric draft retention, hidden-workspace keyboard exclusion, responsive layout, and annotations, with no console errors or failed requests in the final reported check. The final refinement did not rerun every earlier browser scenario. This handoff does not itself accept Milestone 2.
 
 14 Oct 2026, on this working tree:
 

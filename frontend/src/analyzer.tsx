@@ -5,7 +5,7 @@ import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js"
 import { api, streamUrl } from "./api/client"
 import type { Asset, ChartDocument, ChartSummary, Job, Peaks } from "./api/types"
 import { ChartView } from "./chart"
-import { clock, playbackCaption, statusLabel, TECHNICAL, toWavePeaks } from "./catalog"
+import { clock, evidenceLabel, formatLabel, playbackCaption, statusLabel, TECHNICAL, toWavePeaks } from "./catalog"
 import {
   cueColor,
   cueKey,
@@ -20,9 +20,6 @@ export function TechnicalBoard({
   charts,
   chartId,
   document,
-  jobStatus,
-  notice,
-  onAnalyze,
   onSelect,
   onSeek,
   playhead = null,
@@ -32,9 +29,6 @@ export function TechnicalBoard({
   charts: ChartSummary[]
   chartId: string
   document: ChartDocument | null
-  jobStatus: string
-  notice: string
-  onAnalyze: () => void
   onSelect: (chartId: string) => void
   onSeek: (seconds: number) => void
   playhead?: number | null
@@ -55,8 +49,10 @@ export function TechnicalBoard({
     setHoldLyrics(false)
   }, [assetId])
 
+  const loadingChart = selected.status !== "not_run" && !active
+
   return (
-    <section>
+    <section className="study-frame">
       <div className="tabs" role="tablist" aria-label="Study">
         <button
           type="button"
@@ -78,93 +74,133 @@ export function TechnicalBoard({
           Lyrics & Inspiration
         </button>
       </div>
-      <div className="workspace">
-        {tab === "technical" ? (
-          <div role="tabpanel">
-            {rows.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="category"
-                aria-current={item.id === selected.id ? "true" : undefined}
-                onClick={() => onSelect(item.id)}
-              >
-                {item.id} {item.title}
-                <br />
-                <small>{statusLabel(item.status)}</small>
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {holdLyrics && lyricsPanel ? (
-          <div style={{ display: tab === "lyrics" ? "contents" : "none" }}>{lyricsPanel}</div>
-        ) : null}
-        {tab === "lyrics" && !lyricsPanel ? (
-          <>
-            <div role="tabpanel">
-              <p>Text</p>
-              <p className="quiet">No lyric file is attached.</p>
+      <div className="study">
+        <div className="workspace">
+          {tab === "technical" ? (
+            <div className="chart-nav" role="tabpanel">
+              <label className="chart-picker">
+                Chart
+                <select aria-label="Chart" value={selected.id} onChange={(event) => onSelect(event.target.value)}>
+                  {rows.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.id} {item.title} ({statusLabel(item.status)})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="chart-buttons">
+                {rows.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="category"
+                    aria-current={item.id === selected.id ? "true" : undefined}
+                    onClick={() => onSelect(item.id)}
+                  >
+                    {item.id} {item.title}
+                    <br />
+                    <small>{statusLabel(item.status)}</small>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div>
-              <h2 className="m-0 font-serif text-3xl font-medium">Lyrics & Inspiration</h2>
-              <p>Open a recording to attach lyrics. Sung timing is not guessed.</p>
+          ) : null}
+          {holdLyrics && lyricsPanel ? (
+            <div className="lyric-mount" hidden={tab !== "lyrics"} inert={tab !== "lyrics"}>
+              {lyricsPanel}
             </div>
-            <aside>
-              <h2 className="m-0 font-serif text-2xl font-medium">Evidence</h2>
-              <p>No evidence yet.</p>
-            </aside>
-          </>
-        ) : null}
-        {tab === "technical" ? (
-          <div>
-            <h2 className="m-0 font-serif text-3xl font-medium">
-              {selected.id} {selected.title}
-            </h2>
-            <p>Status: {statusLabel(active?.status ?? selected.status)}</p>
-            {jobStatus ? <p>Analysis {statusLabel(jobStatus)}.</p> : null}
-            {active?.status === "ready" ? <ChartView chart={active} onSeek={onSeek} playhead={playhead} /> : null}
-            {active && active.status !== "ready" && active.status !== "not_run" ? (
-              <p>{active.not_available_reason || active.error}</p>
-            ) : null}
-            {(active?.status ?? selected.status) === "not_run" ? (
-              <p>Not run. Nothing has been measured for this recording.</p>
-            ) : null}
-            {selected.status !== "not_run" && !active ? <p>Loading this chart.</p> : null}
-            <button type="button" className="action" onClick={onAnalyze}>
-              Analyze
-            </button>
-            {notice ? (
-              <p className="notice" role="status">
-                {notice}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-        {tab === "technical" ? (
-          <aside>
-            <h2 className="m-0 font-serif text-2xl font-medium">Evidence</h2>
-            {active && active.status !== "not_run" ? (
-              <>
-                <p>{active.evidence_class}</p>
-                <p>
-                  {active.method_id} {active.method_version}
+          ) : null}
+          {tab === "lyrics" && !lyricsPanel ? (
+            <>
+              <div className="line-list" role="tabpanel">
+                <p>Text</p>
+                <p className="quiet">No lyric file is attached.</p>
+              </div>
+              <div className="editor">
+                <h2>Lyrics & Inspiration</h2>
+                <p>Open a recording to attach lyrics. Sung timing is not guessed.</p>
+              </div>
+              <aside className="inspector">
+                <h2>Evidence</h2>
+                <p>No evidence yet.</p>
+              </aside>
+            </>
+          ) : null}
+          {tab === "technical" ? (
+            <div className="plot">
+              <h2>
+                {selected.id} {selected.title}
+              </h2>
+              <p>Status: {statusLabel(active?.status ?? selected.status)}</p>
+              {active?.status === "ready" ? <ChartView chart={active} onSeek={onSeek} playhead={playhead} /> : null}
+              {active && active.status !== "ready" && active.status !== "not_run" ? (
+                <p className="feedback is-alert" role="alert">
+                  {active.not_available_reason || active.error}
                 </p>
-                {active.summary.map((item) => (
-                  <p key={item.label}>
-                    {item.label}: {item.value}
-                  </p>
-                ))}
-                {active.caveats.map((item) => (
-                  <p key={item}>{item}</p>
-                ))}
-              </>
-            ) : (
-              <p>No evidence yet.</p>
-            )}
-          </aside>
-        ) : null}
+              ) : null}
+              {(active?.status ?? selected.status) === "not_run" ? (
+                <p>Not run. Nothing has been measured for this recording.</p>
+              ) : null}
+              {loadingChart ? (
+                <p className="feedback" role="status">
+                  Loading this chart.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          {tab === "technical" ? (
+            <aside className="inspector">
+              <h2>Evidence</h2>
+              {loadingChart ? <p className="quiet">Evidence for this chart is still loading.</p> : null}
+              {!loadingChart && active && active.status !== "not_run" ? (
+                <dl className="evidence">
+                  <div>
+                    <dt>Class</dt>
+                    <dd>{evidenceLabel(active.evidence_class)}</dd>
+                  </div>
+                  <div>
+                    <dt>Method</dt>
+                    <dd>
+                      {active.method_id} {active.method_version}
+                    </dd>
+                  </div>
+                  {active.summary.map((item) => (
+                    <div key={item.label}>
+                      <dt>{item.label}</dt>
+                      <dd className="num">{item.value}</dd>
+                    </div>
+                  ))}
+                  {active.caveats.map((item) => (
+                    <div key={item}>
+                      <dt>Limitation</dt>
+                      <dd>{item}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
+              {!loadingChart && (!active || active.status === "not_run") ? <p>No evidence yet.</p> : null}
+            </aside>
+          ) : null}
+        </div>
       </div>
     </section>
+  )
+}
+
+function waveHeight(): number {
+  if (typeof window.matchMedia !== "function") {
+    return 84
+  }
+  return window.matchMedia("(max-width: 927px)").matches ? 40 : 84
+}
+
+function Ruler({ duration }: { duration: number }) {
+  return (
+    <div className="ruler" aria-hidden="true">
+      {[0, 0.25, 0.5, 0.75, 1].map((mark) => (
+        <span key={mark}>{clock(duration * mark)}</span>
+      ))}
+    </div>
   )
 }
 
@@ -195,6 +231,7 @@ function Transport({
   const [error, setError] = useState("")
   const [regionsReady, setRegionsReady] = useState(0)
   const duration = peaks.duration_s
+  const volumeRef = useRef<HTMLDetailsElement>(null)
 
   useEffect(() => {
     const container = host.current
@@ -206,7 +243,7 @@ function Transport({
       url: streamUrl(asset.id),
       peaks: toWavePeaks(peaks.buckets),
       duration,
-      height: 96,
+      height: waveHeight(),
       waveColor: "#8b95a3",
       progressColor: "#c4a36a",
       cursorColor: "#e8e6e1",
@@ -217,6 +254,17 @@ function Transport({
       dragToSeek: true,
       normalize: false,
     })
+    const narrow = typeof window.matchMedia === "function" ? window.matchMedia("(max-width: 927px)") : null
+    const fit = () => {
+      if (typeof wave.setOptions === "function") {
+        wave.setOptions({ height: waveHeight() })
+      }
+      if (volumeRef.current && narrow) {
+        volumeRef.current.open = !narrow.matches
+      }
+    }
+    fit()
+    narrow?.addEventListener("change", fit)
     player.current = wave
     regionsRef.current = wave.registerPlugin(RegionsPlugin.create()) as unknown as LyricRegionPlugin
     setRegionsReady((count) => count + 1)
@@ -238,6 +286,7 @@ function Transport({
     ]
     return () => {
       seekRef.current = () => undefined
+      narrow?.removeEventListener("change", fit)
       unsubscribers.forEach((unsubscribe) => unsubscribe())
       regionsRef.current = null
       wave.destroy()
@@ -273,9 +322,10 @@ function Transport({
   }, [activeCueId, cues, regionsReady])
 
   return (
-    <div>
+    <div className="deck-wave">
       <div ref={host} className="wave" />
-      <p>{playbackCaption(asset)}</p>
+      <Ruler duration={duration} />
+      <p className="quiet deck-caption">{playbackCaption(asset)}</p>
       <div className="transport">
         <button
           type="button"
@@ -287,10 +337,10 @@ function Transport({
           {playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
           {playing ? "Pause" : "Play"}
         </button>
-        <span>
+        <span className="num">
           {clock(time, true)} / {clock(duration, true)}
         </span>
-        <label>
+        <label className="transport-seek">
           Seek
           <input
             type="range"
@@ -302,8 +352,8 @@ function Transport({
             onChange={(event) => player.current?.setTime(Number(event.target.value))}
           />
         </label>
-        <label>
-          Volume
+        <details className="transport-volume" open ref={volumeRef}>
+          <summary>Volume</summary>
           <input
             type="range"
             min={0}
@@ -313,9 +363,13 @@ function Transport({
             aria-label="Volume"
             onChange={(event) => player.current?.setVolume(Number(event.target.value))}
           />
-        </label>
+        </details>
       </div>
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? (
+        <p className="feedback is-alert" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -453,35 +507,73 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
     }
   }
 
+  const jobText = notice || job?.error || ""
+  const jobFeedback = jobText
+    ? { role: "alert" as const, text: jobText }
+    : job
+      ? { role: "status" as const, text: `Analysis ${statusLabel(job.status)}.` }
+      : null
+
   return (
-    <>
-      <h1 className="page-title">Analyzer</h1>
-      {loadError ? <p role="alert">{loadError}</p> : null}
-      {!asset && !loadError ? <p>Loading the recording.</p> : null}
+    <div className="recording">
+      {loadError ? (
+        <p className="feedback is-alert" role="alert">
+          {loadError}
+        </p>
+      ) : null}
+      {!asset && !loadError ? <p role="status">Loading the recording.</p> : null}
       {asset ? (
         <>
-          <p>{`${asset.original_name}. Analysis ${statusLabel(asset.analysis_status)}.`}</p>
-          {asset.playback_status === "unavailable" ? <p>{playbackCaption(asset)}</p> : null}
-          {peaks ? (
-            <Transport
-              asset={asset}
-              peaks={peaks}
-              seekRef={seekRef}
-              onTime={onTime}
-              cues={cues}
-              activeCueId={activeCueId}
-              regionNonce={regionNonce}
-              lyricBridge={lyricBridge}
-            />
-          ) : null}
-          {asset.playback_status === "ready" && !peaks && !loadError ? <p>Loading playback.</p> : null}
+          <div className="deck">
+            <div className="deck-meta">
+              <div className="deck-id">
+                <h1 className="page-title">{asset.original_name}</h1>
+                <p className="quiet num">
+                  {formatLabel(asset)} · {clock(asset.duration_s)}
+                </p>
+              </div>
+              <dl className="evidence deck-status">
+                <div>
+                  <dt>Analysis</dt>
+                  <dd>{statusLabel(asset.analysis_status)}</dd>
+                </div>
+                <div>
+                  <dt>Playback</dt>
+                  <dd>{statusLabel(asset.playback_status)}</dd>
+                </div>
+              </dl>
+              <button type="button" className="action" onClick={() => void onAnalyze()}>
+                Analyze
+              </button>
+            </div>
+            {asset.playback_status === "unavailable" ? <p className="quiet">{playbackCaption(asset)}</p> : null}
+            {peaks ? (
+              <Transport
+                asset={asset}
+                peaks={peaks}
+                seekRef={seekRef}
+                onTime={onTime}
+                cues={cues}
+                activeCueId={activeCueId}
+                regionNonce={regionNonce}
+                lyricBridge={lyricBridge}
+              />
+            ) : null}
+            {asset.playback_status === "ready" && !peaks && !loadError ? (
+              <p className="feedback" role="status">
+                Loading playback.
+              </p>
+            ) : null}
+            {jobFeedback ? (
+              <p className={jobFeedback.role === "alert" ? "feedback is-alert" : "feedback"} role={jobFeedback.role}>
+                {jobFeedback.text}
+              </p>
+            ) : null}
+          </div>
           <TechnicalBoard
             charts={charts}
             chartId={chartId}
             document={document}
-            jobStatus={job?.status ?? ""}
-            notice={notice || job?.error || ""}
-            onAnalyze={() => void onAnalyze()}
             onSelect={setChartId}
             onSeek={onSeek}
             playhead={playhead}
@@ -502,6 +594,6 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
           />
         </>
       ) : null}
-    </>
+    </div>
   )
 }

@@ -115,7 +115,9 @@ describe("playback cursor", () => {
 
   it("keeps the player mounted and moves the chart playhead", async () => {
     render(<Analyzer assetId="a" />)
-    await screen.findByRole("button", { name: "Play" })
+    const play = await screen.findByRole("button", { name: "Play" })
+    expect(play.closest(".deck")).toBeTruthy()
+    expect(play.closest(".study")).toBeNull()
     await waitFor(() => expect(created).toEqual([1]))
     await screen.findByRole("img", { name: "T01" })
     onTime?.(1.5)
@@ -124,6 +126,7 @@ describe("playback cursor", () => {
       const series = moved?.series as { markLine?: { data?: { xAxis?: number }[] } }[]
       expect(series?.[0]?.markLine?.data?.[0]?.xAxis).toBe(1.5)
     })
+    expect(screen.getByRole("button", { name: /T01/ }).closest(".study")).toBeTruthy()
     fireEvent.click(screen.getByRole("button", { name: /T02/ }))
     await screen.findByRole("img", { name: "T02" })
     expect(created).toEqual([1])

@@ -114,11 +114,11 @@ describe("library studies", () => {
 
   it("wraps long filenames only in the narrow library", () => {
     const css = styles()
-    const desktop = css.slice(0, css.indexOf("@media (max-width: 860px)"))
+    const desktop = css.slice(0, css.indexOf("@media (max-width: 927px)"))
     const desktopName = desktop.slice(desktop.indexOf(".log td.name {"))
     expect(desktopName).toContain("white-space: nowrap")
     expect(desktopName).toContain("text-overflow: ellipsis")
-    const narrow = css.slice(css.indexOf("@media (max-width: 860px)"))
+    const narrow = css.slice(css.indexOf("@media (max-width: 927px)"))
     const narrowName = narrow.slice(narrow.indexOf(".log td.name {"), narrow.indexOf("}", narrow.indexOf(".log td.name {")))
     expect(narrowName).toContain("white-space: normal")
     expect(narrowName).toContain("overflow-wrap: anywhere")
@@ -126,7 +126,7 @@ describe("library studies", () => {
 
   it("packs the mobile shell under the navigation", () => {
     const css = styles()
-    const narrow = css.slice(css.indexOf("@media (max-width: 860px)"))
+    const narrow = css.slice(css.indexOf("@media (max-width: 927px)"))
     const shell = narrow.slice(narrow.indexOf(".shell {"), narrow.indexOf("}", narrow.indexOf(".shell {")))
     expect(shell).toContain("align-content: start")
   })
