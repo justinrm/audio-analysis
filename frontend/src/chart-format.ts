@@ -3,14 +3,14 @@ import { clock, evidenceLabel } from "./catalog"
 /** Page ground. Series colors are checked against this in chart-format tests. */
 export const PLOT_GROUND = "#14171c"
 export const SERIES_INK = "#e8e6e1"
-export const SERIES_ENERGY = "#8eb4d4"
-export const SERIES_LUFS = "#c5d4c0"
-export const SERIES_WARM = "#d7c4b0"
-export const SERIES_SLATE = "#a8b0ba"
-export const SERIES_ESTIMATED = "#c5d0dc"
-export const SERIES_PLAYHEAD = "#e6e0d4"
+export const SERIES_ENERGY = "#8ec8f0"
+export const SERIES_LUFS = "#8fce8a"
+export const SERIES_WARM = "#e2b07a"
+export const SERIES_SLATE = "#c5ced8"
+export const SERIES_ESTIMATED = "#d4b6ea"
+export const SERIES_PLAYHEAD = "#f3efe6"
 export const SERIES_REVIEW = "#c4a36a"
-export const AXIS_TITLE = "#a8b0ba"
+export const AXIS_TITLE = "#b7c2ce"
 
 /**
  * Sequential heatmap. The low stop is darker slate than the page, at about 3:1.
@@ -120,7 +120,10 @@ export function seriesPaint(
     return { color: SERIES_ENERGY, dash: "dashed" }
   }
   if (unit === "amplitude") {
-    return { color: SERIES_INK, dash: "solid" }
+    if (index < 2) {
+      return { color: SERIES_INK, dash: "solid" }
+    }
+    return { color: SERIES_SLATE, dash: "dashed" }
   }
   if (unit === "dBFS") {
     return { color: SERIES_ENERGY, dash: "solid" }

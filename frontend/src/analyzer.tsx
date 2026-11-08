@@ -1,4 +1,4 @@
-import { Pause, Play } from "lucide-react"
+import { ChevronsDown, ChevronsUp, Pause, Play } from "lucide-react"
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import WaveSurfer from "wavesurfer.js"
 import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js"
@@ -81,7 +81,7 @@ export function TechnicalBoard({
         </button>
       </div>
       <div className="study">
-        <div className="workspace">
+        <div className={tab === "technical" ? "workspace" : "workspace lyrics"}>
           {tab === "technical" ? (
             <div className="chart-nav" role="tabpanel">
               <label className="chart-picker">
@@ -141,7 +141,7 @@ export function TechnicalBoard({
                   <span className="evidence-word"> {evidenceLabel(active.evidence_class)}</span>
                 ) : null}
               </h2>
-              <p>Status: {statusLabel(active?.status ?? selected.status)}</p>
+              <p className="quiet plot-status">Status: {statusLabel(active?.status ?? selected.status)}</p>
               {active?.status === "ready" ? <ChartView chart={active} onSeek={onSeek} playhead={playhead} /> : null}
               {active && active.status !== "ready" ? <ChartDataTable chart={active} /> : null}
               {active && active.status !== "ready" && active.status !== "not_run" ? (
@@ -157,55 +157,53 @@ export function TechnicalBoard({
                   Loading this chart.
                 </p>
               ) : null}
-            </div>
-          ) : null}
-          {tab === "technical" ? (
-            <aside className="inspector">
-              <h2>Evidence</h2>
-              {loadingChart ? <p className="quiet">Evidence for this chart is still loading.</p> : null}
-              {!loadingChart && active && active.status !== "not_run" ? (
-                <>
-                  <h3>Identity</h3>
-                  <dl className="evidence">
-                    <div>
-                      <dt>Class</dt>
-                      <dd>{evidenceLabel(active.evidence_class)}</dd>
-                    </div>
-                    <div>
-                      <dt>Method</dt>
-                      <dd>{active.method_id}</dd>
-                    </div>
-                    <div>
-                      <dt>Version</dt>
-                      <dd>{active.method_version}</dd>
-                    </div>
-                  </dl>
-                  <h3>Figures</h3>
-                  <dl className="evidence">
-                    {active.summary.map((item) => (
-                      <div key={item.label}>
-                        <dt>{item.label}</dt>
-                        <dd className="num">{item.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                  <h3>Limitations</h3>
-                  {active.caveats.length > 0 ? (
+              <details className="inspector" open>
+                <summary>Evidence</summary>
+                {loadingChart ? <p className="quiet">Evidence for this chart is still loading.</p> : null}
+                {!loadingChart && active && active.status !== "not_run" ? (
+                  <>
+                    <h3>Identity</h3>
                     <dl className="evidence">
-                      {active.caveats.map((item) => (
-                        <div key={item}>
-                          <dt>Limitation</dt>
-                          <dd>{item}</dd>
+                      <div>
+                        <dt>Class</dt>
+                        <dd>{evidenceLabel(active.evidence_class)}</dd>
+                      </div>
+                      <div>
+                        <dt>Method</dt>
+                        <dd>{active.method_id}</dd>
+                      </div>
+                      <div>
+                        <dt>Version</dt>
+                        <dd>{active.method_version}</dd>
+                      </div>
+                    </dl>
+                    <h3>Figures</h3>
+                    <dl className="evidence">
+                      {active.summary.map((item) => (
+                        <div key={item.label}>
+                          <dt>{item.label}</dt>
+                          <dd className="num">{item.value}</dd>
                         </div>
                       ))}
                     </dl>
-                  ) : (
-                    <p className="quiet">None recorded.</p>
-                  )}
-                </>
-              ) : null}
-              {!loadingChart && (!active || active.status === "not_run") ? <p>No evidence yet.</p> : null}
-            </aside>
+                    <h3>Limitations</h3>
+                    {active.caveats.length > 0 ? (
+                      <dl className="evidence">
+                        {active.caveats.map((item) => (
+                          <div key={item}>
+                            <dt>Limitation</dt>
+                            <dd>{item}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : (
+                      <p className="quiet">None recorded.</p>
+                    )}
+                  </>
+                ) : null}
+                {!loadingChart && (!active || active.status === "not_run") ? <p>No evidence yet.</p> : null}
+              </details>
+            </div>
           ) : null}
         </div>
       </div>
@@ -214,10 +212,12 @@ export function TechnicalBoard({
 }
 
 function waveHeight(): number {
+  const desktop = 52
+  const phone = 36
   if (typeof window.matchMedia !== "function") {
-    return 84
+    return desktop
   }
-  return window.matchMedia("(max-width: 927px)").matches ? 40 : 84
+  return window.matchMedia("(max-width: 927px)").matches ? phone : desktop
 }
 
 function Ruler({ duration }: { duration: number }) {
@@ -239,6 +239,7 @@ function Transport({
   activeCueId,
   regionNonce,
   lyricBridge,
+  compact,
 }: {
   asset: Asset
   peaks: Peaks
@@ -248,6 +249,7 @@ function Transport({
   activeCueId: string | null
   regionNonce: number
   lyricBridge: { current: LyricBridge }
+  compact: boolean
 }) {
   const host = useRef<HTMLDivElement>(null)
   const player = useRef<WaveSurfer | null>(null)
@@ -258,6 +260,9 @@ function Transport({
   const [regionsReady, setRegionsReady] = useState(0)
   const duration = peaks.duration_s
   const volumeRef = useRef<HTMLDetailsElement>(null)
+  const compactSeen = useRef(false)
+  const compactRef = useRef(compact)
+  compactRef.current = compact
 
   useEffect(() => {
     const container = host.current
@@ -286,7 +291,7 @@ function Transport({
         wave.setOptions({ height: waveHeight() })
       }
       if (volumeRef.current && narrow) {
-        volumeRef.current.open = !narrow.matches
+        volumeRef.current.open = !compactRef.current && !narrow.matches
       }
     }
     fit()
@@ -321,6 +326,36 @@ function Transport({
   }, [asset.id, duration, peaks.buckets, seekRef, onTime])
 
   useEffect(() => {
+    if (!compactSeen.current) {
+      compactSeen.current = true
+      return
+    }
+    const volume = volumeRef.current
+    if (compact) {
+      if (volume) {
+        volume.open = false
+      }
+      return
+    }
+    const wave = player.current
+    if (wave && typeof wave.setOptions === "function") {
+      wave.setOptions({ height: waveHeight() })
+    }
+    const box = host.current
+    const frame = requestAnimationFrame(() => {
+      if (box && box.clientWidth === 0) {
+        return
+      }
+      player.current?.setOptions?.({ height: waveHeight() })
+    })
+    const narrow = typeof window.matchMedia === "function" && window.matchMedia("(max-width: 927px)").matches
+    if (volume) {
+      volume.open = !narrow
+    }
+    return () => cancelAnimationFrame(frame)
+  }, [compact])
+
+  useEffect(() => {
     const plugin = regionsRef.current
     if (!plugin || regionsReady === 0) {
       return
@@ -349,9 +384,11 @@ function Transport({
 
   return (
     <div className="deck-wave">
-      <div ref={host} className="wave" />
-      <Ruler duration={duration} />
-      <p className="quiet deck-caption">{playbackCaption(asset)}</p>
+      <div ref={host} className="wave" hidden={compact} />
+      <div hidden={compact}>
+        <Ruler duration={duration} />
+        <p className="quiet deck-caption">{playbackCaption(asset)}</p>
+      </div>
       <div className="transport">
         <button
           type="button"
@@ -378,7 +415,7 @@ function Transport({
             onChange={(event) => player.current?.setTime(Number(event.target.value))}
           />
         </label>
-        <details className="transport-volume" open ref={volumeRef}>
+        <details className="transport-volume" ref={volumeRef}>
           <summary>Volume</summary>
           <input
             type="range"
@@ -444,6 +481,7 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
     | { kind: "done"; profile: ExportCreate["profile"] }
     | { kind: "error"; message: string }
   >({ kind: "idle" })
+  const [deckExpanded, setDeckExpanded] = useState(true)
   const onCues = useCallback((next: LyricCue[]) => {
     setCues((prev) => (cueKey(prev) === cueKey(next) ? prev : next))
   }, [])
@@ -466,6 +504,7 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
     setActiveCueId(null)
     setLyricDocument(null)
     setExportState({ kind: "idle" })
+    setDeckExpanded(true)
     api
       .asset(assetId)
       .then(async (next) => {
@@ -623,15 +662,15 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
       {!asset && !loadError ? <p role="status">Loading the recording.</p> : null}
       {asset ? (
         <>
-          <div className="deck">
+          <div className={deckExpanded ? "deck" : "deck is-compact"}>
             <div className="deck-meta">
               <div className="deck-id">
                 <h1 className="page-title">{asset.original_name}</h1>
-                <p className="quiet num">
+                <p className="quiet num" hidden={!deckExpanded}>
                   {formatLabel(asset)} · {clock(asset.duration_s)}
                 </p>
               </div>
-              <dl className="evidence deck-status">
+              <dl className="evidence deck-status" hidden={!deckExpanded}>
                 <div>
                   <dt>Analysis</dt>
                   <dd>{statusLabel(asset.analysis_status)}</dd>
@@ -641,73 +680,89 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
                   <dd>{statusLabel(asset.playback_status)}</dd>
                 </div>
               </dl>
-              <button type="button" className="action" onClick={() => void onAnalyze()}>
+              <button type="button" className="action" hidden={!deckExpanded} onClick={() => void onAnalyze()}>
                 Analyze
               </button>
+              <button
+                type="button"
+                className="deck-toggle"
+                aria-expanded={deckExpanded}
+                aria-controls="recording-details"
+                onClick={() => setDeckExpanded((open) => !open)}
+              >
+                {deckExpanded ? (
+                  <ChevronsDown size={16} aria-hidden="true" />
+                ) : (
+                  <ChevronsUp size={16} aria-hidden="true" />
+                )}
+                {deckExpanded ? "Compact player" : "Expand recording"}
+              </button>
             </div>
-            <div className="export-bar">
-              <label>
-                Lyric text
-                <select
-                  aria-label="Lyric text in export"
-                  value={lyricMode}
+            <div id="recording-details" hidden={!deckExpanded}>
+              <div className="export-bar">
+                <label>
+                  Lyric text
+                  <select
+                    aria-label="Lyric text in export"
+                    value={lyricMode}
+                    disabled={!projectId || exportState.kind === "loading"}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      if (value === "summarized" || value === "included" || value === "omitted") {
+                        setLyricMode(value)
+                      }
+                    }}
+                  >
+                    <option value="summarized">Summarized</option>
+                    <option value="included">Included</option>
+                    <option value="omitted">Omitted</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="action"
                   disabled={!projectId || exportState.kind === "loading"}
-                  onChange={(event) => {
-                    const value = event.target.value
-                    if (value === "summarized" || value === "included" || value === "omitted") {
-                      setLyricMode(value)
-                    }
-                  }}
+                  onClick={() => void onExport("technical")}
                 >
-                  <option value="summarized">Summarized</option>
-                  <option value="included">Included</option>
-                  <option value="omitted">Omitted</option>
-                </select>
-              </label>
-              <button
-                type="button"
-                className="action"
-                disabled={!projectId || exportState.kind === "loading"}
-                onClick={() => void onExport("technical")}
-              >
-                Export Technical ZIP
-              </button>
-              <button
-                type="button"
-                className="action"
-                disabled={!projectId || !lyricDocument || exportState.kind === "loading"}
-                onClick={() => void onExport("lyricist")}
-              >
-                Export Lyricist ZIP
-              </button>
-              <button
-                type="button"
-                className="action"
-                disabled={!projectId || !lyricDocument || exportState.kind === "loading"}
-                onClick={() => void onExport("combined")}
-              >
-                Export Combined ZIP
-              </button>
+                  Export Technical ZIP
+                </button>
+                <button
+                  type="button"
+                  className="action"
+                  disabled={!projectId || !lyricDocument || exportState.kind === "loading"}
+                  onClick={() => void onExport("lyricist")}
+                >
+                  Export Lyricist ZIP
+                </button>
+                <button
+                  type="button"
+                  className="action"
+                  disabled={!projectId || !lyricDocument || exportState.kind === "loading"}
+                  onClick={() => void onExport("combined")}
+                >
+                  Export Combined ZIP
+                </button>
+              </div>
+              {!projectId ? <p className="quiet">Open this recording from a study to export.</p> : null}
+              {projectId && !lyricDocument ? (
+                <p className="quiet">Attach a lyric document to export a Lyricist or Combined package.</p>
+              ) : null}
+              {exportState.kind === "loading" ? (
+                <p className="feedback" role="status">
+                  Preparing the {exportName(exportState.profile)} ZIP.
+                </p>
+              ) : null}
+              {exportState.kind === "done" ? (
+                <p className="feedback" role="status">
+                  {exportName(exportState.profile)} ZIP downloaded.
+                </p>
+              ) : null}
+              {exportState.kind === "error" ? (
+                <p className="feedback is-alert" role="alert">
+                  {exportState.message}
+                </p>
+              ) : null}
             </div>
-            {!projectId ? <p className="quiet">Open this recording from a study to export.</p> : null}
-            {projectId && !lyricDocument ? (
-              <p className="quiet">Attach a lyric document to export a Lyricist or Combined package.</p>
-            ) : null}
-            {exportState.kind === "loading" ? (
-              <p className="feedback" role="status">
-                Preparing the {exportName(exportState.profile)} ZIP.
-              </p>
-            ) : null}
-            {exportState.kind === "done" ? (
-              <p className="feedback" role="status">
-                {exportName(exportState.profile)} ZIP downloaded.
-              </p>
-            ) : null}
-            {exportState.kind === "error" ? (
-              <p className="feedback is-alert" role="alert">
-                {exportState.message}
-              </p>
-            ) : null}
             {asset.playback_status === "unavailable" ? <p className="quiet">{playbackCaption(asset)}</p> : null}
             {peaks ? (
               <Transport
@@ -719,6 +774,7 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
                 activeCueId={activeCueId}
                 regionNonce={regionNonce}
                 lyricBridge={lyricBridge}
+                compact={!deckExpanded}
               />
             ) : null}
             {asset.playback_status === "ready" && !peaks && !loadError ? (

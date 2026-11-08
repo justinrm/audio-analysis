@@ -908,6 +908,27 @@ describe("lyric workspace", () => {
     expect(bus.created).toEqual([1])
   })
 
+  it("keeps the lyric draft and player when the deck collapses", async () => {
+    api.lyrics.mockResolvedValue(document({ segments: [segment({ id: "s", text: "keep", ordinal: 0 })] }))
+    render(<Analyzer assetId="a" projectId="p" />)
+    await screen.findByRole("button", { name: "Play" })
+    await waitFor(() => expect(bus.created).toEqual([1]))
+    fireEvent.click(screen.getByRole("tab", { name: "Lyrics & Inspiration" }))
+    const line = await screen.findByLabelText("Text for Line 1")
+    fireEvent.change(line, { target: { value: "unsaved line" } })
+    fireEvent.click(screen.getByRole("button", { name: "Compact player" }))
+    expect(screen.getByRole("button", { name: "Expand recording" }).getAttribute("aria-expanded")).toBe("false")
+    expect(screen.queryByRole("button", { name: "Export Technical ZIP" })).toBeNull()
+    fireEvent.click(screen.getByRole("tab", { name: "Technical Analysis" }))
+    expect(screen.getByRole("button", { name: "Expand recording" })).toBeTruthy()
+    fireEvent.click(screen.getByRole("tab", { name: "Lyrics & Inspiration" }))
+    expect((screen.getByLabelText("Text for Line 1") as HTMLTextAreaElement).value).toBe("unsaved line")
+    expect(api.updateSegment).not.toHaveBeenCalled()
+    expect(bus.created).toEqual([1])
+    fireEvent.click(screen.getByRole("button", { name: "Expand recording" }))
+    expect(screen.getByRole("button", { name: "Export Technical ZIP" })).toBeTruthy()
+  })
+
   it("keeps an unsaved lyric draft when the inspiration chart changes", async () => {
     api.lyrics.mockResolvedValue(document({ segments: [segment({ id: "s", text: "keep", ordinal: 0 })] }))
     workspace()

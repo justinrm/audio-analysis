@@ -107,6 +107,13 @@ export function LyricCharts({
           {chart.caveats.map((caveat) => (
             <p key={caveat}>{caveat}</p>
           ))}
+          {plotted ? (
+            <ChartView
+              chart={chart}
+              onSeek={onSeek}
+              playhead={chart.axis_definitions.x === "Line" ? null : playhead}
+            />
+          ) : null}
           {chart.summary.length > 0 ? (
             <dl className="evidence">
               {chart.summary.map((item, index) => (
@@ -116,13 +123,6 @@ export function LyricCharts({
                 </div>
               ))}
             </dl>
-          ) : null}
-          {plotted ? (
-            <ChartView
-              chart={chart}
-              onSeek={onSeek}
-              playhead={chart.axis_definitions.x === "Line" ? null : playhead}
-            />
           ) : null}
           <Findings chart={chart} />
         </>

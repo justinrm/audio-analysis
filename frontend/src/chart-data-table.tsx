@@ -41,7 +41,13 @@ export function ChartDataTable({ chart }: { chart: ChartDocument }) {
 
   return (
     <section aria-label="Data table">
-      <button type="button" aria-expanded={open} aria-controls={controls} onClick={() => setOpen((value) => !value)}>
+      <button
+        type="button"
+        className="chart-data-toggle"
+        aria-expanded={open}
+        aria-controls={controls}
+        onClick={() => setOpen((value) => !value)}
+      >
         Data table
       </button>
       {open ? (

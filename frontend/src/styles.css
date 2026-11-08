@@ -98,7 +98,7 @@ textarea {
 /* 1332 / 1100 / 928 match plotBudget() in catalog.ts at a 16px root. */
 .workspace {
   display: grid;
-  grid-template-columns: 10rem minmax(0, 1fr) 13.75rem;
+  grid-template-columns: 10rem minmax(0, 1fr);
   gap: 0.75rem;
   align-items: start;
 }
@@ -113,8 +113,19 @@ textarea {
 .deck {
   flex: none;
   background: var(--color-ground);
-  padding-bottom: 0.5rem;
+  padding-bottom: 0.35rem;
   border-bottom: 1px solid var(--color-rule);
+}
+
+.deck .page-title {
+  font-size: 1.05rem;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.deck-id .quiet,
+.deck-caption {
+  margin: 0;
 }
 
 .deck-meta {
@@ -139,9 +150,14 @@ textarea {
 .export-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: end;
-  margin-top: 0.75rem;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
+.export-bar .action,
+.deck-meta > .action {
+  padding: 0.3rem 0.55rem;
 }
 
 .export-bar label {
@@ -150,6 +166,73 @@ textarea {
   gap: 0.2rem;
   color: var(--color-secondary);
   font-size: 0.85rem;
+}
+
+.deck-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  background: transparent;
+  color: var(--color-ink);
+  border: 1px solid var(--color-rule);
+  border-radius: 2px;
+  padding: 0.3rem 0.55rem;
+  cursor: pointer;
+}
+
+.deck-toggle[aria-expanded="false"] {
+  border-color: var(--color-brass);
+  color: var(--color-brass);
+}
+
+.deck.is-compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+}
+
+.deck.is-compact .deck-meta {
+  flex: 1 1 12rem;
+  min-width: 0;
+  gap: 0.35rem 0.65rem;
+}
+
+.deck.is-compact .deck-id {
+  min-width: 0;
+}
+
+.deck.is-compact .page-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deck.is-compact .deck-wave {
+  display: contents;
+}
+
+.deck.is-compact .transport {
+  flex: 2 1 18rem;
+  margin-top: 0;
+  min-width: min(100%, 16rem);
+}
+
+.deck.is-compact .transport-seek input[type="range"] {
+  height: 1.25rem;
+}
+
+.deck.is-compact .transport-volume summary {
+  pointer-events: auto;
+}
+
+.recording:has(.deck.is-compact) .chart {
+  height: clamp(22rem, calc(100dvh - 16rem), 40rem);
+}
+
+.recording:has(.deck.is-compact) .chart.stacked {
+  height: clamp(34rem, calc(100dvh - 12rem), 56rem);
 }
 
 .study-frame {
@@ -172,6 +255,37 @@ textarea {
 .chart-nav,
 .line-list {
   min-width: 0;
+}
+
+.plot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.chart-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  align-self: start;
+  max-height: calc(100dvh - 8rem);
+  overflow: auto;
+  background: var(--color-ground);
+}
+
+.plot-status {
+  margin: 0;
+}
+
+.plot .inspector {
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--color-rule);
+  padding-top: 0.35rem;
+}
+
+.plot .inspector summary {
+  cursor: pointer;
+  font-weight: 550;
 }
 
 .chart-picker {
@@ -508,19 +622,22 @@ textarea {
 
 .wave {
   min-height: 0;
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
   background: var(--color-panel);
 }
 
 .chart {
-  height: min(28rem, 62vh);
-  min-height: 16rem;
+  height: clamp(22rem, calc(100dvh - 24rem), 34rem);
+  min-height: 22rem;
   width: 100%;
+  flex: none;
+  border: 1px solid var(--color-rule);
+  background: var(--color-ground);
 }
 
 .chart.stacked {
-  height: min(36rem, 70vh);
-  min-height: 22rem;
+  height: clamp(34rem, calc(100dvh - 20rem), 50rem);
+  min-height: 34rem;
 }
 
 .lyric-charts {
@@ -532,6 +649,14 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+}
+
+.lyric-charts .chart-buttons .category {
+  width: auto;
+  flex: none;
+  white-space: nowrap;
+  border-bottom: 0;
+  padding: 0.35rem 0.55rem;
 }
 
 .lyric-findings td,
@@ -565,6 +690,17 @@ textarea {
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.chart-data-toggle {
+  align-self: flex-start;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-rule);
+  border-radius: 0;
+  color: var(--color-secondary);
+  cursor: pointer;
+  padding: 0.2rem 0;
 }
 
 .chart-data-scroll {
@@ -632,9 +768,9 @@ textarea {
 .transport {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 1rem;
+  gap: 0.35rem 0.75rem;
   align-items: center;
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
 }
 
 .transport span {
@@ -746,38 +882,24 @@ textarea {
 }
 
 @media (min-width: 1332px) {
-  .study {
-    overflow: hidden;
+  .study:has(.workspace.lyrics) {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
-  .workspace {
+  .workspace.lyrics {
+    grid-template-columns: 10rem minmax(0, 1fr) 13.75rem;
     flex: 1;
     min-height: 0;
     align-items: stretch;
   }
 
-  .chart-nav,
-  .line-list,
-  .plot,
-  .editor,
-  .inspector {
+  .workspace.lyrics .line-list,
+  .workspace.lyrics .editor,
+  .workspace.lyrics .inspector {
     min-height: 0;
-    max-height: 100%;
     overflow: auto;
-  }
-
-  .plot {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .plot .chart,
-  .plot .chart.stacked {
-    flex: 1 1 auto;
-    height: auto;
-    min-height: 0;
   }
 }
 
@@ -970,7 +1092,7 @@ textarea {
     flex-basis: auto;
   }
 
-  .chart-buttons {
+  .chart-nav .chart-buttons {
     display: none;
   }
 
@@ -986,12 +1108,6 @@ textarea {
     border: 1px solid var(--color-line);
     border-radius: 2px;
     padding: 0.4rem 0.55rem;
-  }
-
-  .chart,
-  .chart.stacked {
-    height: 18rem;
-    min-height: 14rem;
   }
 
   .stage {

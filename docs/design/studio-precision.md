@@ -2,7 +2,7 @@
 
 Approved direction for the frontend. A design pass is not a product milestone.
 
-For the accepted checkpoint sequence, verification history, and current phase, see [Project status](../../PROJECT_STATUS.md). The [Pass 3 readiness report](studio-precision-pass3.md) is a separate proposal.
+For the accepted checkpoint sequence, verification history, and current phase, see [Project status](../../PROJECT_STATUS.md). The [Pass 3 readiness report](studio-precision-pass3.md) is a separate proposal. The Analyzer Readability & Compact Recording Deck Pass was accepted November 8, 2026, and is recorded in project status. This Pass 2 record is unchanged by that decision.
 
 ## Pass 2 acceptance
 

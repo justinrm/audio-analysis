@@ -122,6 +122,7 @@ describe("milestone 1 analysis state", () => {
     expect(screen.getByText("Status: Ready")).toBeTruthy()
     expect(screen.getByText("Short files make the loudness range unstable.")).toBeTruthy()
     expect(screen.getByRole("heading", { name: "Limitations" })).toBeTruthy()
+    expect((screen.getByText("Evidence").closest("details") as HTMLDetailsElement).open).toBe(true)
     expect(screen.getByRole("button", { name: /T03/i }).textContent).toMatch(/Failed/)
     expect(screen.queryByRole("progressbar")).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: /sample peak/i }))
@@ -156,7 +157,8 @@ describe("milestone 1 analysis state", () => {
     expect(workspaceMode(1280)).toBe("list-side")
     expect(workspaceMode(1000)).toBe("stacked")
     expect(workspaceMode(390)).toBe("phone")
-    expect(plotBudget(1440)).toBe(828)
+    expect(plotBudget(1440)).toBe(1060)
+    expect(plotBudget(1332)).toBe(952)
     expect(plotBudget(1280)).toBe(900)
     expect(plotBudget(1100)).toBe(720)
     expect(plotBudget(1099)).toBe(891)
@@ -164,7 +166,8 @@ describe("milestone 1 analysis state", () => {
     expect(plotBudget(928)).toBe(720)
     expect(plotBudget(927)).toBe(895)
     expect(plotBudget(390)).toBe(358)
-    expect(plotBudget(1332)).toBe(720)
+    expect(plotBudget(1440)).toBeGreaterThanOrEqual(720)
+    expect(plotBudget(1100)).toBeGreaterThanOrEqual(720)
   })
 
   it("labels job and playback status without rewriting evidence class", () => {

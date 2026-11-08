@@ -123,17 +123,15 @@ export function workspaceMode(viewportWidth: number): "wide" | "list-side" | "st
 }
 
 /**
- * Usable plot width after the rail, 16px stage padding on each side, the list,
- * the inspector, and 12px gaps. Assumes a 16px root, matching styles.css.
+ * Usable plot width after the rail, 16px stage padding on each side, the chart
+ * list, and one 12px gap. Evidence sits under the plot, so it is not subtracted.
+ * Assumes a 16px root, matching styles.css.
  */
 export function plotBudget(viewportWidth: number): number {
   const mode = workspaceMode(viewportWidth)
   const rail = mode === "phone" ? 0 : 176
   const inner = viewportWidth - rail - 32
-  if (mode === "wide") {
-    return inner - 160 - 220 - 24
-  }
-  if (mode === "list-side") {
+  if (mode === "wide" || mode === "list-side") {
     return inner - 160 - 12
   }
   return inner

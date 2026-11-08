@@ -84,6 +84,8 @@ describe("chart display format", () => {
     expect(seriesPaint("LUFS", 0, "measured", "T02").dash).toBe("dashed")
     expect(seriesPaint("dB", 0, "measured", "T05").dash).toBe("dashed")
     expect(seriesPaint("amplitude", 0, "measured", "T01").color).toBe(SERIES_INK)
+    expect(seriesPaint("amplitude", 2, "measured", "T01").color).toBe(SERIES_SLATE)
+    expect(seriesPaint("amplitude", 2, "measured", "T01").dash).toBe("dashed")
     expect(seriesPaint("dBFS", 0, "measured", "T01").color).not.toBe(SERIES_REVIEW)
   })
 })

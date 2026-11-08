@@ -530,6 +530,45 @@ describe("lyric regions", () => {
     expect(technical.every((item) => item.markArea == null)).toBe(true)
   })
 
+  it("keeps lyric region bands and leaves their names off a legend chart", () => {
+    resetPlot()
+    render(
+      <ChartView
+        chart={{
+          ...ending,
+          chart_kind: "L03",
+          title: "Energy and dynamic contrast",
+          series: {
+            lines: [
+              { name: "1 s RMS", unit: "dBFS", x: [0.5], y: [-12] },
+              { name: "3 s short-term LUFS", unit: "LUFS", x: [0.5], y: [-10] },
+            ],
+            bars: [],
+            heatmap: null,
+          },
+          axis_definitions: { x: "Time (s)", y: "dBFS or LUFS", y_scale: "linear" },
+          review_markers: [],
+          regions: [
+            {
+              evidence_id: "ly:a",
+              segment_id: "a",
+              label: "Hello",
+              start_s: 0.25,
+              end_s: 0.75,
+              evidence_class: "textual" as const,
+            },
+          ],
+        }}
+        onSeek={() => undefined}
+      />,
+    )
+    const grid = (chartOption().grid as { top?: number; height?: string }[])[0]
+    const series = chartOption().series as { markArea?: { label?: { show?: boolean } } }[]
+    expect(grid?.top).toBe(36)
+    expect(grid?.height).toBe("40%")
+    expect(series.some((item) => item.markArea?.label?.show === false)).toBe(true)
+  })
+
   it("does not add a file-time playhead on a line-index chart", () => {
     resetPlot()
     const density: ChartDocument = {
@@ -569,5 +608,71 @@ describe("lyric regions", () => {
     render(<ChartView chart={energy} onSeek={() => undefined} />)
     const xAxis = chartOption().xAxis as { data?: string[] }[]
     expect(xAxis.some((axis) => axis.data?.includes("0.0–1.0 s"))).toBe(true)
+  })
+})
+
+type GridBox = { top?: number | string; height?: number | string; bottom?: number | string }
+
+function gridSpan(grid: GridBox, height: number): { top: number; bottom: number } {
+  const px = (value: number | string) => (typeof value === "number" ? value : (Number.parseFloat(value) / 100) * height)
+  const top = grid.top === undefined ? 0 : px(grid.top)
+  const bottom = grid.height !== undefined ? top + px(grid.height) : height - (grid.bottom === undefined ? 0 : px(grid.bottom))
+  return { top, bottom }
+}
+
+function expectSeparated(grids: GridBox[], height: number, minBand: number) {
+  const bands = grids.map((grid) => gridSpan(grid, height)).sort((left, right) => left.top - right.top)
+  for (const band of bands) {
+    expect(band.bottom - band.top).toBeGreaterThanOrEqual(minBand)
+  }
+  for (let index = 1; index < bands.length; index += 1) {
+    expect(bands[index].top - bands[index - 1].bottom).toBeGreaterThanOrEqual(8)
+  }
+}
+
+describe("panel geometry", () => {
+  it("keeps subplot bands apart at the stacked minimum height", () => {
+    const height = 544
+    resetPlot()
+    render(<ChartView chart={waveform} onSeek={() => undefined} />)
+    expectSeparated(chartOption().grid as GridBox[], height, 100)
+
+    resetPlot()
+    render(<ChartView chart={spectral} onSeek={() => undefined} />)
+    const spectralAxes = chartOption().xAxis as {
+      name?: string
+      nameGap?: number
+      axisLabel?: { interval?: number; alignMinLabel?: string; alignMaxLabel?: string }
+    }[]
+    const spectralY = chartOption().yAxis as { axisLabel?: { interval?: number; verticalAlignMinLabel?: string } }[]
+    expect(spectralAxes.every((axis) => axis.name === "Time (s)")).toBe(true)
+    expect(spectralAxes[0]?.axisLabel?.interval).toBe(0)
+    expect(spectralAxes[0]?.axisLabel?.alignMinLabel).toBe("left")
+    expect(spectralAxes[0]?.axisLabel?.alignMaxLabel).toBe("right")
+    expect(spectralAxes[0]?.nameGap).toBe(34)
+    expect(spectralY[0]?.axisLabel?.interval).toBe(0)
+    expect(spectralY[0]?.axisLabel?.verticalAlignMinLabel).toBe("bottom")
+    expectSeparated(chartOption().grid as GridBox[], height, 100)
+
+    resetPlot()
+    const stereo: ChartDocument = {
+      ...waveform,
+      chart_kind: "T05",
+      title: "Stereo field",
+      series: {
+        lines: [
+          { name: "Correlation", unit: "ratio", x: [0, 1], y: [0.2, 0.8] },
+          { name: "Side/mid", unit: "dB", x: [0, 1], y: [-6, -3] },
+        ],
+        bars: [{ label: "Mono", value: 0.4 }],
+        heatmap: null,
+      },
+      axis_definitions: { x: "Time (s)", y: "Correlation", y_scale: "linear" },
+      review_markers: [],
+    }
+    render(<ChartView chart={stereo} onSeek={() => undefined} />)
+    const grids = chartOption().grid as GridBox[]
+    expect(grids).toHaveLength(3)
+    expectSeparated(grids, height, 100)
   })
 })

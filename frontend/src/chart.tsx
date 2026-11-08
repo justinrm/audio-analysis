@@ -122,13 +122,16 @@ export function ChartView({
         plot.setOption({ legend: { selected: resolutionSelected(end - start < 99.5) } })
       })
     }
+    let showRegionLabels = element.clientWidth === 0 || element.clientWidth >= 720
     const observer = new ResizeObserver(() => {
       plot.resize()
       const next = tickBudget(element.clientWidth)
-      if (next === bucket) {
+      const nextLabels = element.clientWidth === 0 || element.clientWidth >= 720
+      if (next === bucket && nextLabels === showRegionLabels) {
         return
       }
       bucket = next
+      showRegionLabels = nextLabels
       apply(element.clientWidth)
     })
     observer.observe(element)
@@ -247,32 +250,39 @@ function optionFor(chart: PlotDocument, playhead: number | null, plotWidth: numb
     const index = grids.length
     const flat = heat.z.flat().filter((value) => Number.isFinite(value))
     const yIsTime = fileTime(chart.axis_definitions.y)
+    const traces = lines.length > 0
+    const heatRight = plotWidth === 0 || plotWidth >= 720 ? 128 : 84
     grids.push({
-      left: yIsTime ? 80 : 92,
-      right: 78,
-      top: lines.length > 1 ? 44 : 28,
-      height: lines.length > 0 ? "46%" : undefined,
-      bottom: lines.length > 0 ? undefined : 72,
+      left: yIsTime ? 84 : 96,
+      right: heatRight,
+      top: traces ? 40 : 32,
+      height: traces ? "42%" : undefined,
+      bottom: traces ? undefined : 92,
     })
     xAxis.push({
       type: "category",
       gridIndex: index,
       name: chart.axis_definitions.x,
       nameLocation: "middle",
-      nameGap: 28,
+      nameGap: 34,
       nameTextStyle: NAME,
       data: fileTime(chart.axis_definitions.x) ? sparseTimeLabels(heat.x, budget) : heat.x.map(String),
-      axisLabel: TICK,
+      axisLabel: {
+        ...TICK,
+        interval: 0,
+        alignMinLabel: "left",
+        alignMaxLabel: "right",
+      },
     })
     yAxis.push({
       type: "category",
       gridIndex: index,
       name: chart.axis_definitions.y,
       nameLocation: "middle",
-      nameGap: 56,
+      nameGap: 52,
       nameTextStyle: NAME,
       data: yIsTime ? sparseTimeLabels(heat.y, budget) : frequencyTickLabels(heat.y),
-      axisLabel: TICK,
+      axisLabel: { ...TICK, interval: 0, verticalAlignMinLabel: "bottom" },
     })
     remember(playheads, index, index, chart.axis_definitions.x, chart.axis_definitions.y, heat.x, yIsTime ? heat.y : undefined)
     series.push({
@@ -284,13 +294,13 @@ function optionFor(chart: PlotDocument, playhead: number | null, plotWidth: numb
     if (lines.length > 0) {
       const lineIndex = grids.length
       const extent = valueExtent(heat.x)
-      grids.push({ left: 92, right: 78, top: "58%", bottom: 96 })
+      grids.push({ left: 96, right: heatRight, top: "60%", bottom: 92 })
       xAxis.push({
         type: "value",
         gridIndex: lineIndex,
         name: chart.axis_definitions.x,
         nameLocation: "middle",
-        nameGap: 28,
+        nameGap: 34,
         nameTextStyle: NAME,
         ...(extent ? { min: extent.min, max: extent.max } : {}),
         axisLabel: { ...TICK, formatter: (value: number) => formatFileTime(value) },
@@ -300,7 +310,7 @@ function optionFor(chart: PlotDocument, playhead: number | null, plotWidth: numb
         gridIndex: lineIndex,
         name: lines[0]?.unit,
         nameLocation: "middle",
-        nameGap: 56,
+        nameGap: 52,
         nameTextStyle: NAME,
         axisLabel: TICK,
       })
@@ -325,11 +335,13 @@ function optionFor(chart: PlotDocument, playhead: number | null, plotWidth: numb
       group,
       gridBox(groupIndex, panelCount),
       groupIndex === groups.length - 1,
+      plotWidth,
     )
   })
   if (bars.length > 0) {
     const index = grids.length
-    grids.push(gridBox(groups.length, panelCount))
+    const grid = gridBox(groups.length, panelCount)
+    grids.push(bars.length > 6 ? { ...grid, bottom: 120 } : grid)
     xAxis.push({
       type: "category",
       gridIndex: index,
@@ -341,7 +353,7 @@ function optionFor(chart: PlotDocument, playhead: number | null, plotWidth: numb
       gridIndex: index,
       name: barAxisName(chart),
       nameLocation: "middle",
-      nameGap: 56,
+      nameGap: 52,
       nameTextStyle: NAME,
       min: chart.chart_kind === "T07" ? 0 : undefined,
       max: chart.chart_kind === "T07" ? 1 : undefined,
@@ -452,9 +464,9 @@ function withMap(
       seriesIndex: 0,
       calculable: false,
       orient: "vertical",
-      right: 4,
-      top: 36,
-      bottom: 78,
+      right: 8,
+      top: (chart.series.lines?.length ?? 0) > 0 ? 40 : 32,
+      bottom: (chart.series.lines?.length ?? 0) > 0 ? "52%" : 92,
       text: [`${high.toFixed(digits)} ${unit}`, `${low.toFixed(digits)}`],
       textStyle: { color: SERIES_INK, fontSize: 11 },
       inRange: { color: [...HEATMAP_COLORS] },
@@ -499,6 +511,7 @@ function pushLines(
   group: LineGroup,
   grid: echarts.GridComponentOption,
   showXLabels: boolean,
+  plotWidth: number,
 ) {
   const index = grids.length
   grids.push(grid)
@@ -511,7 +524,7 @@ function pushLines(
       gridIndex: index,
       name: showXLabels ? xName : "",
       nameLocation: "middle",
-      nameGap: 28,
+      nameGap: 34,
       nameTextStyle: NAME,
       min: Math.min(...positive),
       max: Math.max(...positive),
@@ -523,7 +536,7 @@ function pushLines(
       gridIndex: index,
       name: showXLabels ? xName : "",
       nameLocation: "middle",
-      nameGap: 28,
+      nameGap: 34,
       nameTextStyle: NAME,
       axisLabel: {
         ...TICK,
@@ -538,7 +551,7 @@ function pushLines(
     gridIndex: index,
     name: group.yName,
     nameLocation: "middle",
-    nameGap: 64,
+    nameGap: 52,
     nameTextStyle: NAME,
     scale: chart.chart_kind === "T02" || chart.chart_kind === "L03" || undefined,
     min: group.yMin,
@@ -551,7 +564,7 @@ function pushLines(
   })
   remember(playheads, index, index, xName, group.yName)
   const layer = markerLayer(chart)
-  const areas = regionAreas(chart)
+  const areas = regionAreas(chart, plotWidth)
   group.lines.forEach((line, lineIndex) => {
     const item = lineSeries(
       chart,
@@ -570,14 +583,21 @@ function pushLines(
   })
 }
 
-function regionAreas(chart: PlotDocument): echarts.MarkAreaComponentOption | undefined {
+function regionAreas(chart: PlotDocument, plotWidth: number): echarts.MarkAreaComponentOption | undefined {
   const regions = chart.regions ?? []
   if (regions.length === 0 || !fileTime(chart.axis_definitions.x)) {
     return undefined
   }
+  const narrow = plotWidth > 0 && plotWidth < 720
   return {
     silent: true,
     itemStyle: { color: "rgba(196, 163, 106, 0.28)" },
+    label: {
+      show: (chart.series.lines?.length ?? 0) < 2 && !narrow,
+      position: "insideTop",
+      color: SERIES_INK,
+      fontSize: 11,
+    },
     data: regions.map((region) => [
       { xAxis: region.start_s, name: region.label },
       { xAxis: region.end_s },
@@ -600,26 +620,27 @@ function lineSeries(
     name: line.name,
     showSymbol: false,
     data,
-    lineStyle: { color: paint.color, width: 1.5, type: paint.dash },
+    lineStyle: { color: paint.color, width: 1.75, type: paint.dash },
     itemStyle: { color: paint.color },
   }
 }
 
 function gridBox(index: number, count: number): echarts.GridComponentOption {
-  const base = { left: 92, right: 16 }
+  const base = { left: 96, right: 28 }
+  const foot = 92
   if (count <= 1) {
-    return { ...base, top: 48, bottom: 96 }
+    return { ...base, top: 40, bottom: foot }
   }
   if (count === 2) {
-    return index === 0 ? { ...base, top: 56, height: "30%" } : { ...base, top: "42%", bottom: 128 }
+    return index === 0 ? { ...base, top: 36, height: "40%" } : { ...base, top: "50%", bottom: foot }
   }
   if (index === 0) {
-    return { ...base, top: 36, height: "20%" }
+    return { ...base, top: 36, height: "24%" }
   }
   if (index === 1) {
-    return { ...base, top: "34%", height: "20%" }
+    return { ...base, top: "34%", height: "24%" }
   }
-  return { ...base, top: "60%", bottom: 72 }
+  return { ...base, top: "64%", bottom: foot }
 }
 
 function zoom(
@@ -643,8 +664,8 @@ function zoom(
     type: "slider",
     xAxisIndex: xIndex,
     filterMode: "none",
-    height: 18,
-    bottom: 8,
+    height: 26,
+    bottom: 6,
     labelFormatter: label,
     textStyle: { color: SERIES_INK, fontSize: 11 },
     borderColor: "#3a4150",
@@ -720,7 +741,7 @@ function legendFor(show: boolean, switchResolution: boolean): echarts.LegendComp
   }
   const legend: echarts.LegendComponentOption = {
     type: "scroll",
-    top: 0,
+    top: 4,
     textStyle: { color: SERIES_INK, fontSize: 12 },
     pageIconColor: SERIES_INK,
     pageTextStyle: { color: SERIES_INK },
@@ -734,6 +755,7 @@ function legendFor(show: boolean, switchResolution: boolean): echarts.LegendComp
 function tooltipFor(chart: ChartDocument): echarts.TooltipComponentOption {
   return {
     trigger: "axis",
+    confine: true,
     backgroundColor: PLOT_GROUND,
     borderColor: "#3a4150",
     textStyle: { color: SERIES_INK, fontSize: 12 },
