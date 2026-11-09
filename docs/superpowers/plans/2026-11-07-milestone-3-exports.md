@@ -1,6 +1,6 @@
 # Milestone 3 export scope
 
-> **Implementation reference.** On November 7, 2026, the owner accepted M3-A and M3-B. Milestone 3 overall remains open. On November 8, 2026, the owner accepted new lyric figures as `lyric-png-v2` and new briefs as `lyric-brief-v2`. This plan's `lyric-png-v1` tasks remain the accepted M3-B snapshot. Published ZIPs from that snapshot stay immutable. [PROJECT_STATUS.md](../../../PROJECT_STATUS.md) owns acceptance. [NEXT_SESSION.md](../../../NEXT_SESSION.md) owns the current handoff. The narrative client is not authorized.
+> **Implementation reference.** On November 8, 2026, the owner accepted Milestone 3 with one exception. M3-A and M3-B are accepted. New lyric figures are `lyric-png-v2` and new briefs are `lyric-brief-v2`. This plan's `lyric-png-v1` tasks remain the accepted M3-B snapshot. Published ZIPs from that snapshot stay immutable. The optional evidence-grounded narrative integration is not implemented. That is a deferred requirement, not a removal, and NVIDIA NIM remains unauthorized. [PROJECT_STATUS.md](../../../PROJECT_STATUS.md) owns acceptance. [NEXT_SESSION.md](../../../NEXT_SESSION.md) owns the current handoff.
 
 **Goal:** Produce a per-recording Technical ZIP from stored `m1-v3` evidence, then a Lyricist ZIP and a Combined ZIP from that same evidence plus the current lyric document, without a network client.
 
