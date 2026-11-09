@@ -1,0 +1,41 @@
+---
+description: Bounded execution loop and the end-of-task report
+alwaysApply: true
+---
+
+# Agent execution
+
+Use this after the owner explicitly authorizes a development task. It does not authorize a milestone or accept completed work. `PROJECT_STATUS.md` owns acceptance. `NEXT_SESSION.md` owns the current scope. Do not copy milestone history into this rule.
+
+## Execute
+
+1. Inspect the source the task touches, `git status --short --branch`, and `git rev-parse HEAD`. Read the approved scope.
+2. State a short plan and the significant regression risks.
+3. Implement the whole task. Do not ask approval for each routine edit.
+4. Verify with the checks below.
+5. Fix ordinary test, type, lint, and build failures inside the authorized scope. After two unsuccessful repair cycles, stop and report the blocker unless the owner allows more.
+6. Preserve unrelated worktree changes and original audio bytes. Preserve accepted scientific methods, the current API contract, and approved architecture unless an explicit owner-authorized task specifically requires changes to them. Any authorized changes must follow the applicable versioning, migration, regression-testing, and documentation requirements. Do not silently invalidate previously accepted evidence.
+7. Stop and report when completing a task requires a new milestone, architectural decision, API-contract change, or change to an accepted requirement that the owner has not explicitly authorized. Changes already explicitly authorized by the owner are within the approved scope and may be implemented. Do not expand that authorization or improvise additional decisions.
+8. Passing tests, a finished implementation, and a clean diff are not owner acceptance.
+9. Do not commit, push, merge, delete unrelated files, install dependencies, or call paid external services without explicit owner authorization for those actions. Authorization for implementation alone does not imply authorization for these operations.
+
+## Verify
+
+Run `scripts/verify.sh` once at the end of a non-trivial task. It is the existing backend Ruff/pytest and frontend typecheck/Vitest/build commands. Do not run it after every edit, and do not add a hook for it.
+
+A trivial low-risk edit gets the focused check that covers it. A change to signal processing, audio storage, evidence semantics, the API contract, job lifecycle, or accepted behavior gets `scripts/verify.sh` plus a pytest or Vitest aimed at that behavior when the suite would miss it.
+
+## Report
+
+End the task with:
+
+- Branch and HEAD
+- Approved scope implemented
+- Files changed
+- Tests executed, and whether each passed or failed
+- Tests skipped or not verified
+- Remaining defects, regressions, or uncertainties
+- Decision that needs the owner
+- Ready for independent review: yes or no
+
+Mark a command you ran as verified. Mark a result taken from an earlier report as reported.
