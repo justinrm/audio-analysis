@@ -11,6 +11,7 @@ import {
   cueColor,
   cueKey,
   LyricsWorkspace,
+  regionLabel,
   syncLyricRegions,
   type LyricBridge,
   type LyricCue,
@@ -237,6 +238,7 @@ function Transport({
   onTime,
   cues,
   activeCueId,
+  focusCueId,
   regionNonce,
   lyricBridge,
   compact,
@@ -247,6 +249,7 @@ function Transport({
   onTime: (seconds: number) => void
   cues: LyricCue[]
   activeCueId: string | null
+  focusCueId: string | null
   regionNonce: number
   lyricBridge: { current: LyricBridge }
   compact: boolean
@@ -378,9 +381,12 @@ function Transport({
       if (!cue) {
         continue
       }
-      region.setOptions({ color: cueColor(cue.origin, cue.id === activeCueId) })
+      region.setOptions({
+        color: cueColor(cue.origin, cue.id === activeCueId),
+        content: regionLabel(cue, activeCueId, focusCueId),
+      })
     }
-  }, [activeCueId, cues, regionsReady])
+  }, [activeCueId, cues, focusCueId, regionsReady])
 
   return (
     <div className="deck-wave">
@@ -467,6 +473,7 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
   const onTime = useCallback((seconds: number) => setPlayhead(seconds), [])
   const [cues, setCues] = useState<LyricCue[]>([])
   const [activeCueId, setActiveCueId] = useState<string | null>(null)
+  const [focusCueId, setFocusCueId] = useState<string | null>(null)
   const [regionNonce, setRegionNonce] = useState(0)
   const lyricBridge = useRef<LyricBridge>({
     commit() {},
@@ -772,6 +779,7 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
                 onTime={onTime}
                 cues={cues}
                 activeCueId={activeCueId}
+                focusCueId={focusCueId}
                 regionNonce={regionNonce}
                 lyricBridge={lyricBridge}
                 compact={!deckExpanded}
@@ -805,6 +813,7 @@ export function Analyzer({ assetId, projectId = null }: { assetId: string; proje
                 onSeek={onSeek}
                 onCues={onCues}
                 onActive={onActive}
+                onFocus={setFocusCueId}
                 bridge={lyricBridge}
                 onRegionReset={() => setRegionNonce((count) => count + 1)}
                 onDocument={onLyricDocument}

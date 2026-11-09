@@ -395,7 +395,8 @@ class ExportManifest(BaseModel):
     algorithm_version: str | None
     params_hash: str | None
     renderer_version: Literal["png-r1"]
-    lyric_renderer_version: Literal["lyric-png-v1"] | None
+    lyric_renderer_version: Literal["lyric-png-v2"] | None
+    brief_template_version: Literal["lyric-brief-v2"] | None
     lyric_document_id: str | None
     lyric_revision: int | None
     lyric_source_sha256: str | None

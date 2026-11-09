@@ -248,7 +248,8 @@ def test_lyric_modes_revision_and_combined_package(
         assert body["lyric_revision"] == 1
         assert body["lyric_document_id"] == document["id"]
         assert body["lyric_source_sha256"] == hashlib.sha256(SRT.encode()).hexdigest()
-        assert body["lyric_renderer_version"] == "lyric-png-v1"
+        assert body["lyric_renderer_version"] == "lyric-png-v2"
+        assert body["brief_template_version"] == "lyric-brief-v2"
     assert summarized["content_sha256"] != included["content_sha256"]
     summary_text = b"".join(summary_zip.read(name) for name in summary_zip.namelist())
     omitted_text = b"".join(omitted_zip.read(name) for name in omitted_zip.namelist())
@@ -263,7 +264,16 @@ def test_lyric_modes_revision_and_combined_package(
     assert regions
     assert all(region["start_s"] < region["end_s"] for region in regions)
     assert all(LINE not in region["label"] for region in regions)
+    again, _again_zip = _export(client, project_id, asset_id, "lyricist", "summarized")
+    assert again["content_sha256"] == summarized["content_sha256"]
+    published = settings.data_root / "exports" / f"{summarized['export_id']}.zip"
+    published_bytes = published.read_bytes()
     brief = summary_zip.read("lyricist/brief.md").decode()
+    assert "## Reference identity and provenance" in brief
+    assert "## What the available evidence establishes" in brief
+    assert "## What this package cannot determine" in brief
+    assert "lyric-brief-v2" in brief
+    assert "lyric-png-v2" in brief
     evidence = json.loads(summary_zip.read("lyricist/evidence.json"))
     known = {item["id"] for item in evidence["records"]}
     cites = set(re.findall(r"`((?:ev|ly):[^`]+)`", brief))
@@ -296,6 +306,7 @@ def test_lyric_modes_revision_and_combined_package(
     later, _later_zip = _export(client, project_id, asset_id, "lyricist", "summarized")
     assert later["lyric_revision"] == 2
     assert later["content_sha256"] != summarized["content_sha256"]
+    assert published.read_bytes() == published_bytes
 
 
 def test_failed_export_publishes_nothing(

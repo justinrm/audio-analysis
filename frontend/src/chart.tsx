@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 import * as echarts from "echarts"
 import type { ChartDocument, ChartLine, LyricRegion, ReviewMarker } from "./api/types"
-import { evidenceLabel } from "./catalog"
+import { combinedEvidenceNote, evidenceLabel } from "./catalog"
 import {
   AXIS_TITLE,
   formatCategoryLabel,
@@ -18,6 +18,7 @@ import {
   SERIES_INK,
   SERIES_PLAYHEAD,
   SERIES_REVIEW,
+  SERIES_WARM,
   seriesPaint,
   sparseTimeLabels,
   tickBudget,
@@ -181,11 +182,11 @@ export function ChartView({
         </p>
       ) : null}
       <p className="quiet" id={describedBy}>
-        {evidenceLabel(chart.evidence_class)}. {chart.axis_definitions.x}. {chart.axis_definitions.y}.
+        {evidenceCaption(chart)}
       </p>
       <div
         ref={node}
-        className={stacked ? "chart stacked" : "chart"}
+        className={["chart", stacked ? "stacked" : "", chart.chart_kind === "L02" ? "density" : ""].filter(Boolean).join(" ")}
         role="img"
         aria-label={chart.title}
         aria-describedby={describedBy}
@@ -322,6 +323,10 @@ function optionFor(chart: PlotDocument, playhead: number | null, plotWidth: numb
     return finish(withMap(grids, xAxis, yAxis, series, flat, chart, playheads), playheads, playhead, false)
   }
 
+  if (chart.chart_kind === "L02" && bars.length > 0) {
+    return finish(densityOption(chart, bars, lines), [], null, false)
+  }
+
   const groups = lineGroups(chart)
   const panelCount = groups.length + (bars.length > 0 ? 1 : 0)
   groups.forEach((group, groupIndex) => {
@@ -335,7 +340,6 @@ function optionFor(chart: PlotDocument, playhead: number | null, plotWidth: numb
       group,
       gridBox(groupIndex, panelCount),
       groupIndex === groups.length - 1,
-      plotWidth,
     )
   })
   if (bars.length > 0) {
@@ -371,6 +375,14 @@ function optionFor(chart: PlotDocument, playhead: number | null, plotWidth: numb
     })
   }
   const switchResolution = switchesResolution(chart)
+  const lane = regionLane(chart, series)
+  if (lane) {
+    const hostX = typeof lane.xAxisIndex === "number" ? lane.xAxisIndex : 0
+    const gridIndex = (xAxis[hostX] as { gridIndex?: number } | undefined)?.gridIndex ?? hostX
+    lane.yAxisIndex = yAxis.length
+    yAxis.push({ type: "value", gridIndex, min: 0, max: 1, show: false })
+    series.push(lane)
+  }
   return finish(
     {
       animation: false,
@@ -511,7 +523,6 @@ function pushLines(
   group: LineGroup,
   grid: echarts.GridComponentOption,
   showXLabels: boolean,
-  plotWidth: number,
 ) {
   const index = grids.length
   grids.push(grid)
@@ -564,7 +575,6 @@ function pushLines(
   })
   remember(playheads, index, index, xName, group.yName)
   const layer = markerLayer(chart)
-  const areas = regionAreas(chart, plotWidth)
   group.lines.forEach((line, lineIndex) => {
     const item = lineSeries(
       chart,
@@ -576,33 +586,148 @@ function pushLines(
     if (lineIndex === 0 && layer) {
       item.markLine = layer
     }
-    if (lineIndex === 0 && areas) {
-      item.markArea = areas
-    }
     series.push(item)
   })
 }
 
-function regionAreas(chart: PlotDocument, plotWidth: number): echarts.MarkAreaComponentOption | undefined {
-  const regions = chart.regions ?? []
+function densityOption(chart: ChartDocument, bars: { label: string; value: number }[], lines: ChartLine[]): echarts.EChartsOption {
+  const labels = bars.map((bar) => formatCategoryLabel(bar.label))
+  const rate = lines.find((line) => line.unit === "words/s")
+  const rateByLine = new Map((rate?.x ?? []).map((x, index) => [String(x), rate?.y[index] ?? null]))
+  const rateData = labels.map((label, index) => (rateByLine.has(label) ? (rateByLine.get(label) ?? null) : (rate?.y[index] ?? null)))
+  const interval = labelInterval(labels.length)
+  const categoryLabel = { ...TICK, interval, showMinLabel: true, showMaxLabel: true, hideOverlap: true }
+  return {
+    animation: false,
+    backgroundColor: "transparent",
+    textStyle: { color: SERIES_INK, fontSize: 12 },
+    legend: { ...legendFor(true, false), top: 2 },
+    tooltip: tooltipFor(chart),
+    grid: [
+      { left: 78, right: 18, top: 36, height: "34%" },
+      { left: 78, right: 18, top: "52%", bottom: 42 },
+    ],
+    xAxis: [
+      { type: "category", gridIndex: 0, data: labels, axisLabel: { show: false } },
+      {
+        type: "category",
+        gridIndex: 1,
+        name: chart.axis_definitions.x || "Line",
+        nameLocation: "middle",
+        nameGap: 26,
+        nameTextStyle: NAME,
+        data: labels,
+        axisLabel: categoryLabel,
+      },
+    ],
+    yAxis: [
+      {
+        type: "value",
+        gridIndex: 0,
+        name: "Written words/s",
+        nameLocation: "middle",
+        nameGap: 48,
+        nameTextStyle: NAME,
+        min: 0,
+        axisLabel: TICK,
+      },
+      {
+        type: "value",
+        gridIndex: 1,
+        name: "Written words",
+        nameLocation: "middle",
+        nameGap: 48,
+        nameTextStyle: NAME,
+        min: 0,
+        axisLabel: TICK,
+      },
+    ],
+    series: [
+      {
+        type: "line",
+        name: rate?.name || "Written words per second",
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        data: rateData,
+        showSymbol: false,
+        connectNulls: false,
+        lineStyle: { color: SERIES_WARM, width: 1.75 },
+        itemStyle: { color: SERIES_WARM },
+      },
+      {
+        type: "bar",
+        name: "Written word count",
+        xAxisIndex: 1,
+        yAxisIndex: 1,
+        data: bars.map((bar) => bar.value),
+        itemStyle: { color: SERIES_ENERGY },
+      },
+    ],
+  }
+}
+
+function labelInterval(count: number): number {
+  if (count <= 8) {
+    return 0
+  }
+  return Math.ceil(count / 7) - 1
+}
+
+function regionLane(chart: PlotDocument, series: echarts.SeriesOption[]): echarts.CustomSeriesOption | undefined {
+  const regions = (chart.regions ?? []).filter((region) => region.end_s > region.start_s)
   if (regions.length === 0 || !fileTime(chart.axis_definitions.x)) {
     return undefined
   }
-  const narrow = plotWidth > 0 && plotWidth < 720
-  return {
-    silent: true,
-    itemStyle: { color: "rgba(196, 163, 106, 0.28)" },
-    label: {
-      show: (chart.series.lines?.length ?? 0) < 2 && !narrow,
-      position: "insideTop",
-      color: SERIES_INK,
-      fontSize: 11,
-    },
-    data: regions.map((region) => [
-      { xAxis: region.start_s, name: region.label },
-      { xAxis: region.end_s },
-    ]),
+  const host = series.find((item): item is echarts.LineSeriesOption => item.type === "line")
+  if (!host) {
+    return undefined
   }
+  return {
+    type: "custom",
+    silent: true,
+    xAxisIndex: host.xAxisIndex ?? 0,
+    yAxisIndex: host.yAxisIndex ?? 0,
+    encode: { x: [0, 1] },
+    data: regions.map((region) => [region.start_s, region.end_s]),
+    renderItem(params, api) {
+      const start = api.coord([api.value(0) as number, 0])
+      const end = api.coord([api.value(1) as number, 0])
+      const raw = params.coordSys as { x?: unknown; y?: unknown; width?: unknown; height?: unknown }
+      if (typeof raw.x !== "number" || typeof raw.y !== "number" || typeof raw.width !== "number" || typeof raw.height !== "number") {
+        return
+      }
+      const box = { x: raw.x, y: raw.y, width: raw.width, height: raw.height }
+      const height = 7
+      const shape = clipRect(
+        {
+          x: Math.min(start[0], end[0]),
+          y: box.y + box.height - height - 2,
+          width: Math.max(Math.abs(end[0] - start[0]), 1),
+          height,
+        },
+        box,
+      )
+      if (!shape) {
+        return
+      }
+      return { type: "rect", shape, style: { fill: "rgba(196, 163, 106, 0.9)" } }
+    },
+    z: 3,
+  }
+}
+
+function clipRect(
+  rect: { x: number; y: number; width: number; height: number },
+  box: { x: number; y: number; width: number; height: number },
+) {
+  const x = Math.max(rect.x, box.x)
+  const y = Math.max(rect.y, box.y)
+  const right = Math.min(rect.x + rect.width, box.x + box.width)
+  const bottom = Math.min(rect.y + rect.height, box.y + box.height)
+  if (right <= x || bottom <= y) {
+    return undefined
+  }
+  return { x, y, width: right - x, height: bottom - y }
 }
 
 function lineSeries(
@@ -884,6 +1009,12 @@ function nearestIndex(times: number[], seconds: number): number {
     }
   })
   return best
+}
+
+function evidenceCaption(chart: ChartDocument): string {
+  const note = combinedEvidenceNote(chart.status, chart.evidence_class, chart.caveats)
+  const mixed = note ? ` ${note}` : ""
+  return `${evidenceLabel(chart.evidence_class)}.${mixed} ${chart.axis_definitions.x}. ${chart.axis_definitions.y}.`
 }
 
 function fileTime(label: string | undefined): boolean {

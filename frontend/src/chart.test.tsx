@@ -521,9 +521,10 @@ describe("lyric regions", () => {
     render(<ChartView chart={timeline} playhead={0.4} onSeek={(seconds) => seen.push(seconds)} />)
     fireEvent.click(screen.getByRole("button", { name: /Hello/ }))
     expect(seen).toEqual([0.25])
-    const series = chartOption().series as { markArea?: { data?: { xAxis?: number }[][] }; id?: string }[]
-    expect(series.some((item) => item.markArea?.data?.[0]?.[0]?.xAxis === 0.25)).toBe(true)
-    expect(series.some((item) => item.markArea?.data?.[0]?.[1]?.xAxis === 0.75)).toBe(true)
+    const series = chartOption().series as { type?: string; data?: number[][]; markArea?: unknown }[]
+    const lane = series.find((item) => item.type === "custom")
+    expect(lane?.data).toEqual([[0.25, 0.75]])
+    expect(series.every((item) => item.markArea == null)).toBe(true)
     resetPlot()
     render(<ChartView chart={ending} onSeek={() => undefined} />)
     const technical = chartOption().series as { markArea?: unknown }[]
@@ -563,10 +564,11 @@ describe("lyric regions", () => {
       />,
     )
     const grid = (chartOption().grid as { top?: number; height?: string }[])[0]
-    const series = chartOption().series as { markArea?: { label?: { show?: boolean } } }[]
+    const series = chartOption().series as { type?: string; data?: number[][]; markArea?: unknown }[]
     expect(grid?.top).toBe(36)
     expect(grid?.height).toBe("40%")
-    expect(series.some((item) => item.markArea?.label?.show === false)).toBe(true)
+    expect(series.find((item) => item.type === "custom")?.data).toEqual([[0.25, 0.75]])
+    expect(series.every((item) => item.markArea == null)).toBe(true)
   })
 
   it("does not add a file-time playhead on a line-index chart", () => {
@@ -587,8 +589,37 @@ describe("lyric regions", () => {
     render(<ChartView chart={density} playhead={1.5} onSeek={() => undefined} />)
     const series = chartOption().series as { id?: string }[]
     expect(series.some((item) => String(item.id ?? "").startsWith("playback-playhead"))).toBe(false)
-    const xAxis = chartOption().xAxis as { name?: string }[]
-    expect(xAxis.some((axis) => axis.name === "Line")).toBe(true)
+    const xAxis = chartOption().xAxis as { name?: string; axisLabel?: { interval?: number } }[]
+    const lineAxis = xAxis.find((axis) => axis.name === "Line")
+    expect(lineAxis?.axisLabel?.interval).toBe(0)
+    const yAxis = chartOption().yAxis as { name?: string }[]
+    expect(yAxis.map((axis) => axis.name)).toEqual(["Written words/s", "Written words"])
+  })
+
+  it("spaces line numbers when written density has many lines", () => {
+    resetPlot()
+    const bars = Array.from({ length: 70 }, (_, index) => ({ label: String(index + 1), value: index % 5 }))
+    const density: ChartDocument = {
+      ...ending,
+      chart_kind: "L02",
+      title: "Phrasing and written density",
+      evidence_class: "textual",
+      series: {
+        lines: [{ name: "Written words per second", unit: "words/s", x: bars.map((_, index) => index + 1), y: bars.map(() => 1.5) }],
+        bars,
+        heatmap: null,
+      },
+      axis_definitions: { x: "Line", y: "Written words", y_scale: "linear" },
+      review_markers: [],
+    }
+    render(<ChartView chart={density} onSeek={() => undefined} />)
+    const xAxis = chartOption().xAxis as { name?: string; axisLabel?: { interval?: number; rotate?: number } }[]
+    const lineAxis = xAxis.find((axis) => axis.name === "Line")
+    expect(lineAxis?.axisLabel?.interval).toBe(9)
+    expect(lineAxis?.axisLabel?.rotate).toBeUndefined()
+    const series = chartOption().series as { name?: string; data?: unknown[] }[]
+    expect(series.find((item) => item.name === "Written word count")?.data).toHaveLength(70)
+    expect(series.find((item) => item.name === "Written words per second")?.data).toHaveLength(70)
   })
 
   it("shows stored window labels when a lyric energy chart has no regions", () => {

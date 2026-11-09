@@ -146,7 +146,8 @@ export type ExportManifest = {
   algorithm_version: string | null;
   params_hash: string | null;
   renderer_version: "png-r1";
-  lyric_renderer_version: "lyric-png-v1" | null;
+  lyric_renderer_version: "lyric-png-v2" | null;
+  brief_template_version: "lyric-brief-v2" | null;
   lyric_document_id: string | null;
   lyric_revision: number | null;
   lyric_source_sha256: string | null;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { api } from "./api/client"
 import type { ChartSummary, LyricChartDocument } from "./api/types"
-import { LYRIC, evidenceLabel, statusLabel } from "./catalog"
+import { LYRIC, evidenceLabel, statusLabel, combinedEvidenceNote } from "./catalog"
 import { ChartView } from "./chart"
 
 export function LyricCharts({
@@ -95,8 +95,21 @@ export function LyricCharts({
         <>
           <h3>
             {chart.chart_kind} {chart.title}
-            <span className="evidence-word"> Chart evidence {evidenceLabel(chart.evidence_class)}</span>
+            <span className="evidence-word">
+              {` Chart evidence ${evidenceLabel(chart.evidence_class)}${
+                combinedEvidenceNote(chart.status, chart.evidence_class, chart.caveats)
+                  ? `. ${combinedEvidenceNote(chart.status, chart.evidence_class, chart.caveats)}`
+                  : ""
+              }`}
+            </span>
           </h3>
+          {plotted ? (
+            <ChartView
+              chart={chart}
+              onSeek={onSeek}
+              playhead={chart.axis_definitions.x === "Line" ? null : playhead}
+            />
+          ) : null}
           <p>Status: {statusLabel(chart.status)}</p>
           <p className="quiet">
             Method {chart.method_id} {chart.method_version}
@@ -107,13 +120,6 @@ export function LyricCharts({
           {chart.caveats.map((caveat) => (
             <p key={caveat}>{caveat}</p>
           ))}
-          {plotted ? (
-            <ChartView
-              chart={chart}
-              onSeek={onSeek}
-              playhead={chart.axis_definitions.x === "Line" ? null : playhead}
-            />
-          ) : null}
           {chart.summary.length > 0 ? (
             <dl className="evidence">
               {chart.summary.map((item, index) => (

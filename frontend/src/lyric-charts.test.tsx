@@ -72,9 +72,9 @@ describe("inspiration charts", () => {
     api.lyricChart.mockImplementation(async (_project: string, _asset: string, kind: LyricChartDocument["chart_kind"]) => {
       if (kind === "L01") {
         return chart("L01", {
-          evidence_class: "measured",
+          evidence_class: "unknown",
           analysis_version: "m1-v3",
-          caveats: ["Provisional change markers are unavailable."],
+          caveats: ["This chart combines measured, textual."],
           series: {
             lines: [{ name: "1 s RMS", unit: "dBFS", x: [0.5], y: [-12], evidence_class: "measured", evidence_id: "ev:t02:rms-1s" }],
             bars: [],
@@ -146,7 +146,8 @@ describe("inspiration charts", () => {
     const seen: number[] = []
     render(<LyricCharts projectId="p" assetId="a" documentId="doc" revision={2} playhead={0.4} onSeek={(seconds) => seen.push(seconds)} />)
     expect(await screen.findByRole("heading", { name: /L01 Unified music-and-lyrics timeline/ })).toBeTruthy()
-    expect(screen.getByText(/Chart evidence Measured/)).toBeTruthy()
+    expect(await screen.findByRole("heading", { name: /Chart evidence Unknown/ })).toBeTruthy()
+    expect(screen.getAllByText(/not missing data/).length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole("button", { name: /Hello/ }))
     expect(seen).toEqual([0.25])
     fireEvent.click(screen.getByRole("button", { name: /L02 Density/ }))

@@ -217,6 +217,7 @@ describe("recording exports", () => {
     render(<Analyzer assetId="a" projectId="p" />)
     await screen.findByRole("button", { name: "Play" })
     fireEvent.click(screen.getByRole("tab", { name: "Lyrics & Inspiration" }))
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Cue 1" }))
     const line = await screen.findByLabelText("Text for Cue 1")
     fireEvent.change(line, { target: { value: "unsaved line" } })
     fireEvent.click(screen.getByRole("button", { name: "Export Technical ZIP" }))

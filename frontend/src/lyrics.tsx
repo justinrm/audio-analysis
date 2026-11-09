@@ -35,7 +35,7 @@ type RegionShape = { id: string; start: number; end: number }
 
 export type LyricRegionPlugin = {
   clearRegions: () => void
-  getRegions: () => Array<{ id: string; setOptions: (options: { color?: string }) => void }>
+  getRegions: () => Array<{ id: string; setOptions: (options: { color?: string; content?: string }) => void }>
   addRegion: (options: {
     id: string
     start: number
@@ -131,6 +131,14 @@ export function regionCues(segments: LyricSegmentOut[]): LyricCue[] {
     }
   }
   return cues
+}
+
+/** Waveform text for one cue. Every other cue stays a region without a persistent label. */
+export function regionLabel(cue: LyricCue, activeId: string | null, focusId: string | null): string {
+  if (cue.id === activeId || cue.id === focusId) {
+    return cue.label
+  }
+  return ""
 }
 
 export function cueKey(cues: LyricCue[]): string {
@@ -247,7 +255,7 @@ export function syncLyricRegions(
       drag: true,
       resize: true,
       color: cueColor(cue.origin, false),
-      content: cue.label,
+      content: "",
     })
   }
   applying = false
@@ -289,7 +297,7 @@ function isDirty(segment: LyricSegmentOut, draft: Draft): boolean {
 
 function excerpt(text: string): string {
   const flat = text.replace(/\s+/g, " ").trim()
-  return flat.length <= 42 ? flat : `${flat.slice(0, 41)}…`
+  return flat.length <= 72 ? flat : `${flat.slice(0, 71)}…`
 }
 
 function intervalLabel(segment: LyricSegmentOut): string {
@@ -346,6 +354,7 @@ export function LyricsWorkspace({
   bridge,
   onRegionReset,
   onDocument,
+  onFocus,
 }: {
   projectId: string | null
   assetId: string
@@ -357,6 +366,7 @@ export function LyricsWorkspace({
   bridge: { current: LyricBridge }
   onRegionReset: () => void
   onDocument?: (document: LyricDocumentOut | null) => void
+  onFocus?: (id: string | null) => void
 }) {
   const [project, setProject] = useState<string | null>(projectId)
   const [document, setDocument] = useState<LyricDocumentOut | null>(null)
@@ -368,6 +378,8 @@ export function LyricsWorkspace({
   const [alert, setAlert] = useState("")
   const [busy, setBusy] = useState(false)
   const [hold, setHold] = useState<Hold | null>(null)
+  const [mode, setMode] = useState<"explore" | "edit">("explore")
+  const [query, setQuery] = useState("")
   const [noteStart, setNoteStart] = useState("")
   const [noteEnd, setNoteEnd] = useState("")
   const [noteText, setNoteText] = useState("")
@@ -501,6 +513,10 @@ export function LyricsWorkspace({
   }, [selected])
 
   useEffect(() => {
+    onFocus?.(selected)
+  }, [selected, onFocus])
+
+  useEffect(() => {
     onCues(regionCues(document?.segments ?? []))
   }, [document, onCues])
 
@@ -524,6 +540,20 @@ export function LyricsWorkspace({
       const current = prev[segment.id] ?? blankDraft(segment)
       return { ...prev, [segment.id]: { ...current, ...patch, clear: patch.clear ?? false } }
     })
+  }
+
+  function showExplore() {
+    setMode("explore")
+    const current = docRef.current
+    if (!current) {
+      return
+    }
+    const dirty = current.segments.some((segment) =>
+      isDirty(segment, draftsRef.current[segment.id] ?? blankDraft(segment)),
+    )
+    if (dirty) {
+      setStatus("Unsaved edits are still in the cue list.")
+    }
   }
 
   function select(id: string) {
@@ -880,6 +910,14 @@ export function LyricsWorkspace({
   const activeId = document ? activeSegmentId(document.segments, playhead ?? Number.NaN) : null
   const selectedSegment = document?.segments.find((segment) => segment.id === selected) ?? null
   const selectedDraft = selectedSegment ? draftFor(selectedSegment) : null
+  const needle = query.trim().toLowerCase()
+  const listed = (document?.segments ?? []).filter((segment) => {
+    if (!needle) {
+      return true
+    }
+    const haystack = `${cueLabel(segment)} ${segment.text} ${intervalLabel(segment)} ${originShort(segment.timing_origin)}`.toLowerCase()
+    return haystack.includes(needle)
+  })
 
   function onLineKey(event: KeyboardEvent<HTMLDivElement>) {
     if (!document || (event.key !== "ArrowDown" && event.key !== "ArrowUp")) {
@@ -890,7 +928,10 @@ export function LyricsWorkspace({
       return
     }
     event.preventDefault()
-    const ids = document.segments.map((item) => item.id)
+    const ids = listed.map((item) => item.id)
+    if (ids.length === 0) {
+      return
+    }
     const index = Math.max(0, ids.indexOf(target.id.slice("line-".length)))
     const nextIndex = event.key === "ArrowDown" ? Math.min(ids.length - 1, index + 1) : Math.max(0, index - 1)
     const id = ids[nextIndex]
@@ -909,8 +950,16 @@ export function LyricsWorkspace({
         </p>
         {document ? (
           <p className="quiet">
-            {document.segments.length} lines · revision {document.revision}
+            {listed.length === document.segments.length
+              ? `${document.segments.length} lines · revision ${document.revision}`
+              : `${listed.length} of ${document.segments.length} lines · revision ${document.revision}`}
           </p>
+        ) : null}
+        {document ? (
+          <label>
+            Find a lyric line
+            <input value={query} onChange={(event) => setQuery(event.target.value)} />
+          </label>
         ) : null}
         {document ? (
           <p>
@@ -918,7 +967,8 @@ export function LyricsWorkspace({
           </p>
         ) : null}
         <div className="line-cues">
-          {document?.segments.map((segment) => {
+          {listed.length === 0 && document && document.segments.length > 0 ? <p>No line matches.</p> : null}
+          {listed.map((segment) => {
             const label = cueLabel(segment)
             const draft = draftFor(segment)
             const dirty = isDirty(segment, draft)
@@ -950,32 +1000,18 @@ export function LyricsWorkspace({
         </div>
       </div>
       <div className="editor">
-        <h2>Lyrics & Inspiration</h2>
-        <p>Sung timing is not guessed. Plain text stays unplaced until you assign times.</p>
-        <LyricCharts
-          projectId={project}
-          assetId={assetId}
-          documentId={document?.id ?? null}
-          revision={document?.revision ?? null}
-          playhead={playhead}
-          onSeek={onSeek}
-        />
-        {project ? (
-          <div className="import-row">
-            <label htmlFor="lyric-file">Lyric file</label>
-            <input
-              id="lyric-file"
-              type="file"
-              accept=".txt,.md,.srt,text/plain,text/markdown"
-              disabled={busy || hold != null}
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                event.target.value = ""
-                void onFile(file)
-              }}
-            />
+        <div className="lyric-mode">
+          <h2>Lyrics & Inspiration</h2>
+          <div role="group" aria-label="Workspace mode">
+            <button type="button" className="ghost" aria-pressed={mode === "explore"} onClick={showExplore}>
+              Explore
+            </button>
+            <button type="button" className="ghost" aria-pressed={mode === "edit"} onClick={() => setMode("edit")}>
+              Edit
+            </button>
           </div>
-        ) : null}
+        </div>
+        <p className="quiet">Written timing and stored measurements. Singing is not guessed.</p>
         {status ? (
           <p className="feedback" role="status">
             {status}
@@ -991,6 +1027,45 @@ export function LyricsWorkspace({
             Load the latest lines
           </button>
         ) : null}
+        {selectedSegment ? (
+          <div className="lyric-context">
+            <p>
+              {cueLabel(selectedSegment)} · {intervalLabel(selectedSegment)} · {originShort(selectedSegment.timing_origin)}
+            </p>
+            <p>{selectedSegment.text}</p>
+            {selectedSegment.timing_origin === "unplaced" ? <p>No seek time.</p> : null}
+            {!selectedSegment.usable && selectedSegment.timing_origin !== "unplaced" ? (
+              <p>Not drawn on the waveform.</p>
+            ) : null}
+            {(document?.validation.filter((item) => item.segment_id === selectedSegment.id) ?? []).map((item) => (
+              <p key={`${item.code}:${item.detail}`} className="warn">
+                {item.detail}
+              </p>
+            ))}
+            {!selectedSegment.usable ? (
+              <p className="feedback">Confirm alignment is unavailable until the interval is usable.</p>
+            ) : null}
+            {selectedSegment.usable && selectedSegment.start_s != null ? (
+              <button type="button" className="ghost" onClick={() => select(selectedSegment.id)}>
+                Go to {clock(selectedSegment.start_s, true)}
+              </button>
+            ) : null}
+            {mode === "explore" ? (
+              <button type="button" className="action" onClick={() => setMode("edit")}>
+                Edit {cueLabel(selectedSegment)}
+              </button>
+            ) : null}
+            {selectedSegment.note ? <p>Stored line note: {selectedSegment.note}</p> : null}
+          </div>
+        ) : null}
+        <LyricCharts
+          projectId={project}
+          assetId={assetId}
+          documentId={document?.id ?? null}
+          revision={document?.revision ?? null}
+          playhead={playhead}
+          onSeek={onSeek}
+        />
         {document && document.segments.length === 0 ? <p>This file has no lyric lines.</p> : null}
         {document
           ? document.validation
@@ -1001,12 +1076,11 @@ export function LyricsWorkspace({
                 </p>
               ))
           : null}
-        {selectedSegment && selectedDraft
+        {mode === "edit" && selectedSegment && selectedDraft
           ? (() => {
               const segment = selectedSegment
               const draft = selectedDraft
               const label = cueLabel(segment)
-              const warnings = document?.validation.filter((item) => item.segment_id === segment.id) ?? []
               const saved =
                 conflict?.segmentId === segment.id
                   ? conflict.server.segments.find((item) => item.id === segment.id)
@@ -1020,13 +1094,6 @@ export function LyricsWorkspace({
                   void save(segment, draft)
                 }}
               >
-                {segment.timing_origin === "unplaced" ? <p>No seek time.</p> : null}
-                {!segment.usable && segment.timing_origin !== "unplaced" ? <p>Not drawn on the waveform.</p> : null}
-                {segment.usable && segment.start_s != null ? (
-                  <button type="button" className="ghost" onClick={() => select(segment.id)}>
-                    Go to {clock(segment.start_s, true)}
-                  </button>
-                ) : null}
                 <label>
                   Text for {label}
                   <textarea
@@ -1061,12 +1128,6 @@ export function LyricsWorkspace({
                       : `${clock(Number(draft.start), true)} – ${clock(Number(draft.end), true)}`}
                   </p>
                 </div>
-                {warnings.map((item) => (
-                  <p key={`${item.code}:${item.detail}`} className="warn">
-                    {item.detail}
-                  </p>
-                ))}
-                {segment.note ? <p>Stored line note: {segment.note}</p> : null}
                 {saved ? (
                   <p>
                     Saved revision {conflict?.server.revision}: {saved.text}
@@ -1105,9 +1166,6 @@ export function LyricsWorkspace({
                 {segment.usable && segment.timing_origin !== "manual_verified" && (draft.text !== segment.text || timingChanged(segment, draft)) ? (
                   <p className="feedback">Save this line before confirming alignment.</p>
                 ) : null}
-                {!segment.usable ? (
-                  <p className="feedback">Confirm alignment is unavailable until the interval is usable.</p>
-                ) : null}
               </form>
               )
             })()
@@ -1115,6 +1173,22 @@ export function LyricsWorkspace({
       </div>
       <aside className="inspector">
         <h2>Evidence</h2>
+        {project ? (
+          <div className="import-row">
+            <label htmlFor="lyric-file">Lyric file</label>
+            <input
+              id="lyric-file"
+              type="file"
+              accept=".txt,.md,.srt,text/plain,text/markdown"
+              disabled={busy || hold != null}
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                event.target.value = ""
+                void onFile(file)
+              }}
+            />
+          </div>
+        ) : null}
         {document ? (
           <dl className="evidence">
             <div>

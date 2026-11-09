@@ -15,9 +15,9 @@ Apply authority in this order: the latest explicit owner decision, accepted mile
 ## Supporting records
 
 - [Milestone 2 plan](superpowers/plans/2026-10-13-milestone-2.md) — lyric evidence and L01–L05 design. Milestone 2 is accepted with two synchronization exceptions. Task order and checkboxes are historical planning.
-- [Milestone 3 export scope](superpowers/plans/2026-11-07-milestone-3-exports.md) — Technical, Lyricist, and Combined packages. M3-A and M3-B are accepted. Milestone 3 overall remains open. The narrative client is not authorized.
+- [Milestone 3 export scope](superpowers/plans/2026-11-07-milestone-3-exports.md) — Technical, Lyricist, and Combined packages. M3-A and M3-B are accepted. New lyric figures after the November 8 quality pass use `lyric-png-v2` and `lyric-brief-v2`. Published `lyric-png-v1` packages stay immutable. Milestone 3 overall remains open. The narrative client is not authorized.
 - [M2-A/M2-B QA](qa/m2a-m2b-2026-10-15.md) — dated QA observations, scope limitations, and citation to the original acceptance record.
-- [Studio Precision](design/studio-precision.md) — accepted Pass 2 design and verification record. [Pass 3](design/studio-precision-pass3.md) was accepted November 7, 2026. Its readiness sections remain the proposal history. The Analyzer Readability & Compact Recording Deck Pass was accepted November 8, 2026, and is recorded in [PROJECT_STATUS.md](../PROJECT_STATUS.md).
+- [Studio Precision](design/studio-precision.md) — accepted Pass 2 design and verification record. [Pass 3](design/studio-precision-pass3.md) was accepted November 7, 2026. Its readiness sections remain the proposal history. The Analyzer Readability & Compact Recording Deck Pass and the Lyrics & Inspiration quality pass were accepted November 8, 2026, and are recorded in [PROJECT_STATUS.md](../PROJECT_STATUS.md).
 - [Local toolchain](ENVIRONMENT.md) — recovery notes for a stalled frontend check.
 
 ## Historical references

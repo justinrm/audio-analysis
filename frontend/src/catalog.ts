@@ -108,6 +108,13 @@ export function evidenceLabel(value: string): string {
   return EVIDENCE_LABEL[value] ?? value
 }
 
+export function combinedEvidenceNote(status: string, evidenceClass: string, caveats: readonly string[]): string {
+  if (status === "ready" && evidenceClass === "unknown" && caveats.some((item) => item.includes("combines"))) {
+    return "Combined classes, not missing data."
+  }
+  return ""
+}
+
 /** Viewport modes from docs/design/studio-precision.md. Widths are CSS pixels. */
 export function workspaceMode(viewportWidth: number): "wide" | "list-side" | "stacked" | "phone" {
   if (viewportWidth >= 1332) {

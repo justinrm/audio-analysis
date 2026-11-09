@@ -22,6 +22,19 @@ from pathlib import Path
 from app.charts import KINDS, not_run
 from app.lyric_charts import LYRIC_KINDS, build_lyric_chart, load_stored_charts
 from app.lyric_png import LYRIC_RENDERER_VERSION, write_lyric_png
+
+BRIEF_TEMPLATE_VERSION = "lyric-brief-v2"
+_OBSERVATION_CAP = 8
+_REPEAT_CAP = 5
+_CONTRAST_CAP = 3
+_CLASS_ORDER = {
+    "measured": 0,
+    "estimated": 1,
+    "textual": 2,
+    "interpretive": 3,
+    "unknown": 4,
+    "not_applicable": 5,
+}
 from app.lyrics import LyricError, canonical_evidence, load_document, require_membership
 from app.png import RENDERER_VERSION, rendered_png
 
@@ -226,6 +239,7 @@ def _assemble(
         "params_hash": None if metrics is None else metrics.get("params_hash"),
         "renderer_version": RENDERER_VERSION,
         "lyric_renderer_version": None if document is None else LYRIC_RENDERER_VERSION,
+        "brief_template_version": None if document is None else BRIEF_TEMPLATE_VERSION,
         "lyric_document_id": None if document is None else document["id"],
         "lyric_revision": None if document is None else document["revision"],
         "lyric_source_sha256": None if document is None else document["source_sha256"],
@@ -315,77 +329,125 @@ def _brief(
     evidence: dict,
 ) -> str:
     by_kind = {chart["chart_kind"]: chart for chart in charts}
-    records = evidence.get("records") or []
+    records = [item for item in evidence.get("records") or [] if item.get("id")]
+    known = {item["id"] for item in records}
     lines = [
         "# Lyricist reference brief",
         "",
-        f"Source SHA-256: `{sha}`",
+        "## Reference identity and provenance",
+        f"Recording source SHA-256: `{sha}`",
         f"Analysis version: {_version(metrics)}",
         f"Parameter hash: {_params(metrics)}",
         f"Lyric document: `{document['id']}` revision {document['revision']}",
         f"Lyric source SHA-256: `{document['source_sha256']}`",
-        f"Lyric text mode: {mode}",
-        "Renderer: lyric-png-v1. Method: lyrics-v1. Narrative: none.",
-        "",
-        "## Available musical evidence",
+        f"Lyric renderer: {LYRIC_RENDERER_VERSION}.",
+        f"Brief template: {BRIEF_TEMPLATE_VERSION}.",
+        "Lyric method: lyrics-v1. Technical renderer: png-r1. Narrative: none.",
+        f"Lyric text mode: {mode}.",
+        (
+            "Timing comes from this lyric revision. "
+            "Subtitle-supplied times are not artist confirmation. "
+            "This package does not estimate singing or alignment."
+        ),
     ]
-    musical = [item for item in records if str(item.get("id", "")).startswith("ev:")]
-    if not musical:
-        lines.append("No stored technical evidence is available for this revision.")
-    for item in musical:
-        value = item.get("value")
-        shown = "stored series" if value is None else f"{value} {item.get('unit') or ''}".strip()
-        lines.append(
-            f"- `{item['id']}` ({item.get('evidence_class')}): {item.get('name')} — {shown}."
-        )
-        caveat = item.get("caveat")
-        if caveat:
-            lines.append(f"  Caveat: {caveat}")
-    lines.extend(["", "## Lyric timing"])
+    lines.extend(_provenance_lines(by_kind.get("L02")))
+    lines.extend(["", "## What the available evidence establishes"])
+    observations = _observations(records)
+    shown = observations[:_OBSERVATION_CAP]
     lines.append(
-        "Timing comes from the stored lyric revision. "
-        "Subtitle-supplied times are not artist confirmation. "
-        "This package does not estimate singing or alignment."
+        f"Showing {len(shown)} of {len(observations)} highlightable records. "
+        "Rule: measured, then estimated, then textual summary records, "
+        f"at most {_OBSERVATION_CAP}, ordered by evidence class then evidence id. "
+        "Individual lyric lines are not listed in this section. "
+        "Complete records are in evidence.json."
     )
-    lines.extend(_summary_lines(by_kind.get("L01")))
-    lines.extend(["", "## Written phrasing"])
-    lines.append("Word counts are written tokens, not vocal delivery or breaths.")
-    lines.extend(_summary_lines(by_kind.get("L02")))
-    lines.extend(["", "## Repetition"])
-    lines.append("Spectral similarity is not textual repetition, a melody, or a hook.")
+    if not shown:
+        lines.append("No stored technical or summary evidence is available for this revision.")
+    for item in shown:
+        lines.append(_observation_line(item, mode))
+        caveat = item.get("caveat")
+        if caveat and not _leaks_lyric(str(caveat), item, mode):
+            lines.append(f"  Caveat: {caveat}")
+    lines.extend(["", "## Written phrasing and repetition"])
+    lines.append(
+        "Word counts are written tokens, not vocal delivery or breaths. "
+        "Spectral similarity is not textual repetition, a melody, or a hook."
+    )
     if mode == "omitted":
         lines.append("Original lyric lines and repetition strings are omitted.")
     elif mode == "summarized":
         lines.append("Counts and citation ids are kept. Original lyric lines are not included.")
-    lines.extend(_row_lines(by_kind.get("L04"), "finding"))
-    lines.extend(["", "## Full-mix energy and contrast"])
+    else:
+        lines.append("Original lyric lines for this mode are in evidence.json and the section below.")
+    lines.extend(_summary_only(by_kind.get("L02")))
+    repeats = _repeat_rows(by_kind.get("L04"))
+    repeat_shown = repeats[:_REPEAT_CAP]
+    lines.append(
+        f"Showing {len(repeat_shown)} of {len(repeats)} written-repetition rows, "
+        "the first rows in stored order. Complete rows are in lyricist/charts/L04.json."
+    )
+    for row in repeat_shown:
+        lines.append(_safe_row(row, mode, known))
+    lines.extend(["", "## Energy and contrast"])
     lines.append(
         "Energy values are stored full-mix measurements. They are not singing intensity, "
-        "vocal performance, or emotion."
+        "vocal performance, or emotion. dBFS and LUFS are different measurements."
     )
-    lines.extend(_summary_lines(by_kind.get("L03")))
-    lines.extend(["", "## Transferable principles"])
-    principles = _row_lines(by_kind.get("L05"), "principle")
-    lines.extend(principles or ["No lyrics-v1 principle met its evidence gate."])
-    lines.extend(["", "## Insufficient evidence"])
+    lines.extend(_summary_only(by_kind.get("L03"), skip_contrast=True))
+    contrasts = _contrasts(by_kind.get("L03"))
+    contrast_shown = contrasts[:_CONTRAST_CAP]
+    lines.append(
+        f"Showing {len(contrast_shown)} of {len(contrasts)} consecutive full-mix RMS contrasts, "
+        "the largest absolute differences first. "
+        "Every interval mean remains in lyricist/charts/L03.json."
+    )
+    for value in contrast_shown:
+        lines.append(f"- {value}")
+    lines.extend(["", "## Transferable creative principles"])
+    lines.append(
+        "Principles are interpretive templates gated on stored evidence. "
+        "They are not a listening impression."
+    )
+    principles = _principle_rows(by_kind.get("L05"))
+    if not principles:
+        lines.append("No lyrics-v1 principle met its evidence gate.")
+    for row in principles:
+        lines.append(_safe_row(row, mode, known))
+    lines.extend(["", "## What this package cannot determine"])
     insufficient = (by_kind.get("L05") or {}).get("insufficient") or []
     if not insufficient:
-        lines.append("No insufficient-evidence rows were stored.")
+        lines.extend(
+            [
+                "- Singing performance and vocal delivery.",
+                "- Verified tempo or groove.",
+                "- Melody or hook identity.",
+                "- Instrumentation.",
+                "- Emotional response.",
+                "- Verified song sections.",
+            ]
+        )
     for item in insufficient:
-        cites = ", ".join(f"`{cite}`" for cite in item.get("cites") or [])
-        suffix = f" Citations: {cites}." if cites else ""
+        cites = [
+            cite
+            for cite in item.get("cites") or []
+            if cite in known
+        ]
+        suffix = f" Citations: {', '.join(f'`{cite}`' for cite in cites)}." if cites else ""
         lines.append(f"- {item.get('code')}: {item.get('reason')}{suffix}")
+    lines.extend(["", "## Detailed evidence references"])
+    for kind in LYRIC_KINDS:
+        chart = by_kind.get(kind)
+        status = "missing" if chart is None else chart.get("status")
+        lines.append(f"- {kind}: {status}. JSON and PNG: `lyricist/charts/{kind}.json`.")
+    lines.append("Complete structured evidence: evidence.json.")
     if mode == "included":
-        lines.extend(["", "## Stored lyric lines"])
-        for item in records:
-            if item.get("name") == "lyric_line":
-                lines.append(f"- `{item['id']}`: {item.get('value')}")
+        lyric_lines = [item for item in records if item.get("name") == "lyric_line"]
+        lines.append(f"Original lyric lines in this mode: {len(lyric_lines)}.")
+        for item in lyric_lines:
+            lines.append(f"- `{item['id']}`: {item.get('value')}")
     lines.extend(
         [
-            "",
-            "## Limitations",
             "This brief uses stored evidence and lyrics-v1 templates only.",
-            "It does not add a listening impression, genre, instrumentation, melody, or vocal-performance description.",
             _G3,
             _G6,
             "",
@@ -394,34 +456,126 @@ def _brief(
     return "\n".join(lines)
 
 
-def _summary_lines(chart: dict | None) -> list[str]:
+def _provenance_lines(chart: dict | None) -> list[str]:
+    if not chart:
+        return ["Lyric timing counts are unavailable."]
+    kept = []
+    for item in chart.get("summary") or []:
+        label = str(item.get("label") or "")
+        if label in {"Supplied timing", "Manually edited", "Manually verified", "Unavailable timing"}:
+            kept.append(f"{label}: {item.get('value')}.")
+    return kept or ["Lyric timing counts are unavailable."]
+
+
+def _observations(records: list[dict]) -> list[dict]:
+    chosen = []
+    for item in records:
+        evidence_id = str(item.get("id") or "")
+        if _record_kind(evidence_id) == "line":
+            continue
+        if not evidence_id.startswith(("ev:", "ly:")):
+            continue
+        chosen.append(item)
+    chosen.sort(
+        key=lambda item: (
+            _CLASS_ORDER.get(str(item.get("evidence_class")), 9),
+            str(item["id"]),
+        )
+    )
+    return chosen
+
+
+def _observation_line(item: dict, mode: str) -> str:
+    evidence_id = str(item["id"])
+    name = _public_repeat_name(item, mode)
+    value = item.get("value")
+    if value is None or (mode != "included" and _record_kind(evidence_id) == "line"):
+        shown = "stored series"
+    else:
+        shown = f"{value} {item.get('unit') or ''}".strip()
+    return (
+        f"- `{evidence_id}` ({item.get('evidence_class')}): {name} — {shown}."
+    )
+
+
+def _summary_only(chart: dict | None, skip_contrast: bool = False) -> list[str]:
     if not chart:
         return ["Chart unavailable."]
     lines = [f"{chart['chart_kind']} status: {chart['status']}."]
     reason = chart.get("not_available_reason")
     if reason:
-        lines.append(reason)
+        lines.append(str(reason))
     for item in chart.get("summary") or []:
+        if skip_contrast and item.get("label") == "Contrast":
+            continue
+        if str(item.get("label") or "").startswith("Stored "):
+            continue
         lines.append(f"- {item.get('label')}: {item.get('value')}")
     for caveat in chart.get("caveats") or []:
         lines.append(f"Caveat: {caveat}")
     return lines
 
 
-def _row_lines(chart: dict | None, kind: str) -> list[str]:
-    if not chart:
-        return []
-    lines = []
-    for row in chart.get("rows") or []:
-        if row.get("kind") != kind:
+def _contrasts(chart: dict | None) -> list[str]:
+    found = []
+    for item in (chart or {}).get("summary") or []:
+        if item.get("label") != "Contrast":
             continue
-        cites = ", ".join(f"`{cite}`" for cite in row.get("cites") or [])
-        suffix = f" Citations: {cites}." if cites else ""
-        lines.append(
-            f"- {row.get('evidence_id')} ({row.get('evidence_class')}): "
-            f"{row.get('name')} {row.get('value') or ''}{suffix}".rstrip()
-        )
-    return lines
+        value = str(item.get("value") or "")
+        found.append((_contrast_magnitude(value), value))
+    found.sort(key=lambda item: (-item[0], item[1]))
+    return [value for _magnitude, value in found]
+
+
+def _contrast_magnitude(value: str) -> float:
+    marker = "differ by "
+    if marker not in value:
+        return 0.0
+    number = value.split(marker, 1)[1].split(" dB", 1)[0]
+    try:
+        return abs(float(number))
+    except ValueError:
+        return 0.0
+
+
+def _repeat_rows(chart: dict | None) -> list[dict]:
+    rows = []
+    for row in (chart or {}).get("rows") or []:
+        if str(row.get("evidence_id") or "").startswith("ly:repeat:"):
+            rows.append(row)
+    return rows
+
+
+def _principle_rows(chart: dict | None) -> list[dict]:
+    return [row for row in (chart or {}).get("rows") or [] if row.get("kind") == "principle"]
+
+
+def _safe_row(row: dict, mode: str, known: set[str]) -> str:
+    cites = [cite for cite in row.get("cites") or [] if cite in known]
+    suffix = f" Citations: {', '.join(f'`{cite}`' for cite in cites)}." if cites else ""
+    name = _public_repeat_name(row, mode)
+    evidence_id = str(row.get("evidence_id") or "")
+    value = row.get("value") or ""
+    if mode != "included" and _record_kind(evidence_id) == "line":
+        value = ""
+    label = f"`{evidence_id}`" if evidence_id in known else evidence_id
+    return f"- {label} ({row.get('evidence_class')}): {name} {value}{suffix}".rstrip()
+
+
+def _public_repeat_name(row: dict, mode: str) -> str:
+    evidence_id = str(row.get("evidence_id") or row.get("id") or "")
+    if mode != "included" and evidence_id.startswith(
+        ("ly:repeat:", "ly:principle:written-repetition:")
+    ):
+        return "written_repetition"
+    return str(row.get("name") or "")
+
+
+def _leaks_lyric(caveat: str, item: dict, mode: str) -> bool:
+    if mode == "included":
+        return False
+    value = item.get("value")
+    return isinstance(value, str) and value and value in caveat
 
 
 def _technical_readme(sha: str, metrics: dict | None, document: dict | None, mode: str) -> str:
@@ -460,6 +614,7 @@ def _lyric_readme(sha: str, metrics: dict | None, document: dict, mode: str) -> 
             f"Method: {_version(metrics)}",
             "Lyric method: lyrics-v1",
             f"Lyric renderer: {LYRIC_RENDERER_VERSION}",
+            f"Brief template: {BRIEF_TEMPLATE_VERSION}",
             f"Lyric document: {document['id']} revision {document['revision']}",
             f"Lyric source SHA-256: {document['source_sha256']}",
             f"Lyric text mode: {mode}",
@@ -484,6 +639,7 @@ def _combined_readme(sha: str, metrics: dict | None, document: dict, mode: str) 
             f"Method: {_version(metrics)}",
             f"Technical renderer: {RENDERER_VERSION}",
             f"Lyric renderer: {LYRIC_RENDERER_VERSION}",
+            f"Brief template: {BRIEF_TEMPLATE_VERSION}",
             f"Lyric document: {document['id']} revision {document['revision']}",
             f"Lyric text mode: {mode}",
             "",

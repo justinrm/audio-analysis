@@ -5,6 +5,7 @@ import type { AnnotationOut, LyricDocumentOut, LyricSegmentOut } from "./api/typ
 import { Analyzer } from "./analyzer"
 import {
   activeSegmentId,
+  regionLabel,
   reviewHints,
   syncLyricRegions,
   type LyricCue,
@@ -33,7 +34,7 @@ const api = vi.hoisted(() => ({
 
 const bus = vi.hoisted(() => {
   const handlers = new Map<string, Set<(...args: never[]) => void>>()
-  const added: { id: string; start: number; end: number }[] = []
+  const added: { id: string; start: number; end: number; content: string }[] = []
   let echo = false
   let onTime: ((value: number) => void) | undefined
   return {
@@ -62,10 +63,28 @@ const bus = vi.hoisted(() => {
           added.length = 0
         },
         getRegions() {
-          return added.map((region) => ({ ...region, setOptions() {} }))
+          return added.map((region) => ({
+            ...region,
+            setOptions(next: { content?: string }) {
+              if (next.content != null) {
+                region.content = next.content
+              }
+            },
+          }))
         },
-        addRegion(options: { id: string; start: number; end: number }) {
-          const region = { id: options.id, start: options.start, end: options.end, setOptions() {}, remove() {} }
+        addRegion(options: { id: string; start: number; end: number; content?: string }) {
+          const region = {
+            id: options.id,
+            start: options.start,
+            end: options.end,
+            content: options.content ?? "",
+            setOptions(next: { content?: string }) {
+              if (next.content != null) {
+                region.content = next.content
+              }
+            },
+            remove() {},
+          }
           added.push(region)
           if (echo) {
             handlers.get("region-updated")?.forEach((handler) => handler(region as never))
@@ -177,6 +196,10 @@ function document(overrides: Partial<LyricDocumentOut> = {}): LyricDocumentOut {
     validation: [],
     ...overrides,
   }
+}
+
+async function openEdit() {
+  fireEvent.click(await screen.findByRole("button", { name: /^Edit / }))
 }
 
 function workspace(
@@ -373,6 +396,7 @@ describe("lyric workspace", () => {
     )
     workspace()
     expect(await screen.findByText("Artist-confirmed alignment. Not an acoustic measurement.")).toBeTruthy()
+    await openEdit()
     fireEvent.change(screen.getByLabelText("Text for Line 1"), { target: { value: "Hello there" } })
     fireEvent.click(screen.getByRole("button", { name: "Save Line 1" }))
     expect(await screen.findByText("Manually edited timing. Not artist-confirmed.")).toBeTruthy()
@@ -420,6 +444,7 @@ describe("lyric workspace", () => {
     )
     workspace()
     expect(await screen.findByText("Artist-confirmed alignment. Not an acoustic measurement.")).toBeTruthy()
+    await openEdit()
     fireEvent.change(screen.getByLabelText("End seconds for Line 1"), { target: { value: "1.4" } })
     fireEvent.click(screen.getByRole("button", { name: "Save Line 1" }))
     expect(await screen.findByText("Manually edited timing. Not artist-confirmed.")).toBeTruthy()
@@ -468,6 +493,7 @@ describe("lyric workspace", () => {
       }),
     )
     workspace()
+    await openEdit()
     fireEvent.click(await screen.findByRole("button", { name: "Confirm alignment for Cue 1" }))
     expect(await screen.findByText("Artist-confirmed alignment. Not an acoustic measurement.")).toBeTruthy()
     expect(api.updateSegment).not.toHaveBeenCalled()
@@ -497,6 +523,7 @@ describe("lyric workspace", () => {
         }),
       )
     workspace()
+    await openEdit()
     fireEvent.change(await screen.findByLabelText("Text for Line 1"), { target: { value: "Hello there" } })
     fireEvent.click(screen.getByRole("button", { name: "Save Line 1" }))
     expect(await screen.findByRole("alert")).toBeTruthy()
@@ -563,6 +590,7 @@ describe("lyric workspace", () => {
         }),
       )
     workspace()
+    await openEdit()
     fireEvent.change(await screen.findByLabelText("End seconds for Line 1"), { target: { value: "1.4" } })
     fireEvent.click(screen.getByRole("button", { name: "Save Line 1" }))
     expect(await screen.findByRole("alert")).toBeTruthy()
@@ -625,6 +653,7 @@ describe("lyric workspace", () => {
         }),
       )
     workspace()
+    await openEdit()
     fireEvent.change(await screen.findByLabelText("End seconds for Line 1"), { target: { value: "1.4" } })
     fireEvent.click(screen.getByRole("button", { name: "Save Line 1" }))
     expect(await screen.findByRole("button", { name: "Load the latest lines" })).toBeTruthy()
@@ -662,6 +691,7 @@ describe("lyric workspace", () => {
       }),
     )
     workspace()
+    await openEdit()
     fireEvent.change(await screen.findByLabelText("End seconds for Cue 1"), { target: { value: "2.5" } })
     expect((screen.getByRole("button", { name: "Confirm alignment for Cue 1" }) as HTMLButtonElement).disabled).toBe(true)
     expect(screen.getByText("Save this line before confirming alignment.")).toBeTruthy()
@@ -680,6 +710,7 @@ describe("lyric workspace", () => {
   it("does not commit or seek when a region is rebuilt", () => {
     const commits: Array<[string, number, number]> = []
     const picks: string[] = []
+    const contents: string[] = []
     const handlers = new Map<string, Set<(...args: never[]) => void>>()
     const added: { id: string; start: number; end: number }[] = []
     const plugin = {
@@ -689,8 +720,9 @@ describe("lyric workspace", () => {
       getRegions() {
         return added
       },
-      addRegion(options: { id: string; start: number; end: number }) {
+      addRegion(options: { id: string; start: number; end: number; content?: string }) {
         const region = { id: options.id, start: options.start, end: options.end, setOptions() {}, remove() {} }
+        contents.push(options.content ?? "")
         added.push(region)
         handlers.get("region-updated")?.forEach((handler) => handler(region as never))
         return region
@@ -708,6 +740,7 @@ describe("lyric workspace", () => {
     }, (id) => picks.push(id))
     expect(commits).toEqual([])
     expect(added).toHaveLength(1)
+    expect(contents).toEqual([""])
     stop()
     const moved: LyricCue[] = [{ ...cues[0], end: 1.5, origin: "manual_edit" }]
     syncLyricRegions(plugin as unknown as LyricRegionPlugin, moved, (id, start, end) => {
@@ -720,6 +753,7 @@ describe("lyric workspace", () => {
     )
     expect(picks).toEqual(["s"])
     expect(commits).toEqual([])
+    expect(contents).toEqual(["", ""])
   })
 
   it("asks before replacing a lyric file and reports an empty file", async () => {
@@ -859,14 +893,24 @@ describe("lyric workspace", () => {
       }),
     )
     workspace()
-    const first = await screen.findByLabelText("Text for Line 1")
+    expect((await screen.findByRole("button", { name: "Explore" })).getAttribute("aria-pressed")).toBe("true")
+    expect(screen.queryByLabelText("Text for Line 1")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: /^Line 2/ }))
+    expect(screen.queryByLabelText(/Text for/)).toBeNull()
+    await openEdit()
+    expect(screen.getByLabelText("Text for Line 2")).toBeTruthy()
     expect(screen.getAllByRole("textbox", { name: /Text for/ })).toHaveLength(1)
-    fireEvent.change(first, { target: { value: "one edited" } })
-    fireEvent.click(screen.getByRole("button", { name: /Line 2/ }))
+    fireEvent.click(screen.getByRole("button", { name: /^Line 1/ }))
+    fireEvent.change(screen.getByLabelText("Text for Line 1"), { target: { value: "one edited" } })
+    fireEvent.click(screen.getByRole("button", { name: /^Line 2/ }))
     expect(screen.getByLabelText("Text for Line 2")).toBeTruthy()
     expect(screen.queryByLabelText("Text for Line 1")).toBeNull()
     expect(screen.getByText("Unsaved")).toBeTruthy()
-    fireEvent.click(screen.getByRole("button", { name: /Line 1/ }))
+    fireEvent.click(screen.getByRole("button", { name: "Explore" }))
+    expect(screen.queryByLabelText(/Text for/)).toBeNull()
+    expect(screen.getByText(/still in the cue list/)).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: /^Line 1/ }))
+    await openEdit()
     expect((screen.getByLabelText("Text for Line 1") as HTMLTextAreaElement).value).toBe("one edited")
     expect(api.updateSegment).not.toHaveBeenCalled()
   })
@@ -880,10 +924,12 @@ describe("lyric workspace", () => {
       }),
     )
     workspace()
-    expect(await screen.findByLabelText("Text for Line 1")).toBeTruthy()
+    expect(await screen.findByRole("button", { name: /^Line 1line 0/ })).toBeTruthy()
+    expect(screen.queryByLabelText("Text for Line 1")).toBeNull()
     expect(screen.getAllByRole("button", { name: /Unplaced/ })).toHaveLength(100)
+    await openEdit()
     expect(screen.getAllByRole("textbox", { name: /Text for/ })).toHaveLength(1)
-    fireEvent.click(screen.getByRole("button", { name: /^Line 100/ }))
+    fireEvent.click(screen.getByRole("button", { name: /^Line 100line 99/ }))
     expect(screen.getByLabelText("Text for Line 100")).toBeTruthy()
     expect(screen.queryByLabelText("Text for Line 1")).toBeNull()
   })
@@ -894,6 +940,7 @@ describe("lyric workspace", () => {
     await screen.findByRole("button", { name: "Play" })
     await waitFor(() => expect(bus.created).toEqual([1]))
     fireEvent.click(screen.getByRole("tab", { name: "Lyrics & Inspiration" }))
+    await openEdit()
     const line = await screen.findByLabelText("Text for Line 1")
     fireEvent.change(line, { target: { value: "unsaved line" } })
     fireEvent.click(screen.getByRole("tab", { name: "Technical Analysis" }))
@@ -914,6 +961,7 @@ describe("lyric workspace", () => {
     await screen.findByRole("button", { name: "Play" })
     await waitFor(() => expect(bus.created).toEqual([1]))
     fireEvent.click(screen.getByRole("tab", { name: "Lyrics & Inspiration" }))
+    await openEdit()
     const line = await screen.findByLabelText("Text for Line 1")
     fireEvent.change(line, { target: { value: "unsaved line" } })
     fireEvent.click(screen.getByRole("button", { name: "Compact player" }))
@@ -932,6 +980,7 @@ describe("lyric workspace", () => {
   it("keeps an unsaved lyric draft when the inspiration chart changes", async () => {
     api.lyrics.mockResolvedValue(document({ segments: [segment({ id: "s", text: "keep", ordinal: 0 })] }))
     workspace()
+    await openEdit()
     const line = await screen.findByLabelText("Text for Line 1")
     fireEvent.change(line, { target: { value: "draft stays" } })
     fireEvent.click(screen.getByRole("button", { name: /L02 Density/ }))
@@ -1025,7 +1074,8 @@ describe("lyric workspace", () => {
     await screen.findByRole("button", { name: "Play" })
     fireEvent.click(screen.getByRole("tab", { name: "Lyrics & Inspiration" }))
     await screen.findByText("Cue 1")
-    await waitFor(() => expect(bus.added.map((region) => region.id)).toEqual(["s1", "s2"]))
+    await waitFor(() => expect(bus.added.map((region) => region.content)).toEqual(["Cue 1", ""]))
+    expect(bus.added.map((region) => region.id)).toEqual(["s1", "s2"])
     bus.time(1.5)
     expect(await screen.findByText("Cue 1 · Playing")).toBeTruthy()
     bus.emit("region-clicked", { id: "s2", start: 1, end: 3 } as never, { stopPropagation() {} } as never)
@@ -1044,4 +1094,40 @@ describe("lyric workspace", () => {
       1.5,
     )).toBe("s1")
   })
+
+  it("labels only the active or selected waveform cue", () => {
+    const cue = { id: "s", start: 0, end: 1, label: "Cue 1", origin: "subtitle_supplied" as const }
+    const other = { ...cue, id: "t", label: "Cue 2" }
+    expect(regionLabel(cue, null, null)).toBe("")
+    expect(regionLabel(cue, null, "s")).toBe("Cue 1")
+    expect(regionLabel(other, "s", "s")).toBe("")
+    expect(regionLabel(other, "t", "s")).toBe("Cue 2")
+  })
+
+  it("filters lyric lines and moves between visible cues from the keyboard", async () => {
+    api.lyrics.mockResolvedValue(
+      document({
+        segments: [
+          segment({ id: "s1", text: "alpha street", ordinal: 0 }),
+          segment({ id: "s2", text: "beta road", ordinal: 1 }),
+          segment({ id: "s3", text: "gamma lane", ordinal: 2 }),
+        ],
+      }),
+    )
+    workspace()
+    expect(await screen.findByRole("button", { name: /^Line 1/ })).toBeTruthy()
+    expect(screen.queryByLabelText(/Text for/)).toBeNull()
+    fireEvent.change(screen.getByLabelText("Find a lyric line"), { target: { value: "beta" } })
+    expect(screen.getByText("1 of 3 lines · revision 1")).toBeTruthy()
+    expect(screen.queryByRole("button", { name: /^Line 1/ })).toBeNull()
+    const match = screen.getByRole("button", { name: /^Line 2/ })
+    expect(match).toBeTruthy()
+    fireEvent.change(screen.getByLabelText("Find a lyric line"), { target: { value: "" } })
+    const again = screen.getByRole("button", { name: /^Line 1/ })
+    again.focus()
+    fireEvent.keyDown(again, { key: "ArrowDown" })
+    expect(screen.getByRole("button", { name: /^Line 2/ }).getAttribute("aria-current")).toBe("true")
+    expect(screen.queryByLabelText(/Text for/)).toBeNull()
+  })
+
 })
