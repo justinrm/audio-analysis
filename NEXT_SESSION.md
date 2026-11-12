@@ -4,7 +4,7 @@
 
 Read [PROJECT_STATUS.md](PROJECT_STATUS.md) for the accepted baseline and verification limits. Use the [documentation index](docs/README.md) for the approved requirements.
 
-Milestone 4 Album QC is **accepted** as of November 11, 2026. The accepted implementation is local commit `bb517b5` on `milestone-4-album-qc`, parent `858c062`. This handoff records that acceptance and those local commits. It does not authorize another milestone, a push, a merge, a pull request, or further implementation.
+Milestone 4 Album QC is **accepted** as of November 11, 2026. The accepted implementation is published on `milestone-4-album-qc`, parent `858c062`, in [pull request #1](https://github.com/justinrm/audio-analysis/pull/1). That pull request is open against `main` and is not merged. `main` is still `858c062` and has not integrated Milestone 4. This handoff does not authorize another milestone, a merge, or further implementation.
 
 Accepted Album QC functionality is Library multi-file WAV import into a study; ordered album membership; the Add recordings dialog; analysis orchestration through the existing analyze endpoint, one recording at a time, reusing a completed `m1-v3` run and leaving a queued or running job in place; comparison of stored evidence as `album-qc-v1`; human listening reviews; the T11 level overlay from stored level series; and the deterministic `album-report-v1` ZIP. Absolute sample peak and RMS stay dBFS. Differences of those levels are dB. Integrated loudness stays LUFS. Its differences are LU. Absolute FFmpeg true peak and 4× reconstructed peak stay dBTP. A difference of one true-peak measurement is dB. The numeric difference is unchanged. Album QC does not remeasure.
 
@@ -47,7 +47,7 @@ Accepted limitations: native keyboard activation of the data-table controls was 
 
 ## Current handoff
 
-Milestone 4 is accepted. Local commit `bb517b5` is the implementation. The following commit records this acceptance. Neither commit was pushed or merged. No further implementation is authorized. Do not start another milestone from this handoff. Do not push, merge, or open a pull request unless the owner asks.
+Milestone 4 is accepted and published on `milestone-4-album-qc` in [pull request #1](https://github.com/justinrm/audio-analysis/pull/1). The pull request is open against `main` and is not merged. `main` has not integrated Milestone 4. No further implementation is authorized. Do not start another milestone from this handoff. Do not merge unless the owner asks.
 
 `m1-v3`, `png-r1`, stored measurements, WAV bytes, lyric provenance, and already published ZIP bytes stay unchanged. New lyric exports declare `lyric-png-v2` and `lyric-brief-v2`. The album report is `album-report-v1` and the comparison is `album-qc-v1`.
 
@@ -57,13 +57,13 @@ The [Milestone 3 export scope](docs/superpowers/plans/2026-11-07-milestone-3-exp
 
 ## Not authorized
 
-Another milestone is not authorized. A push, a merge, and a pull request are not authorized. The deferred narrative provider, NVIDIA NIM, contextual phrase-and-contrast summaries, structured artist-supplied listening observations, and optional AI narrative interpretation are not authorized. The chart §2 T11 Welch PSD overlay is deferred as G9 and is not a license to invent spectrum samples. The pair-differences layout refinement and the T11 visualization refinement are not authorized. The narrative requirement is deferred, not deleted. The three exploratory items are not accepted requirements. Milestone 2's exceptions are not a license to change stored measurements.
+Another milestone is not authorized. Merging pull request #1 is not authorized. The repository has no configured CI pipeline. GitHub has not reported a passing automated suite for that pull request. A skipped Sourcery review is not a failed application test. The deferred narrative provider, NVIDIA NIM, contextual phrase-and-contrast summaries, structured artist-supplied listening observations, and optional AI narrative interpretation are not authorized. The chart §2 T11 Welch PSD overlay is deferred as G9 and is not a license to invent spectrum samples. The pair-differences layout refinement and the T11 visualization refinement are not authorized. The narrative requirement is deferred, not deleted. The three exploratory items are not accepted requirements. Milestone 2's exceptions are not a license to change stored measurements.
 
 ## Cursor handoff
 
 1. Run `git status --short --branch`, `git rev-parse HEAD`, and `git log -5 --oneline --decorate` in the local checkout. Preserve unrelated work.
-2. Treat Milestone 4 as accepted in local commit `bb517b5`. Do not implement narrative AI, G9, the pair-differences layout refinement, the T11 visualization refinement, or another milestone unless the owner asks. Absolute true-peak levels stay dBTP. Differences of one true-peak measurement are dB.
-3. Do not push, merge, or open a pull request unless the owner asks. The two local commits are not remote integration.
+2. Treat Milestone 4 as accepted and published in pull request #1. Do not merge it from this handoff. Do not implement narrative AI, G9, the pair-differences layout refinement, the T11 visualization refinement, or another milestone unless the owner asks. Absolute true-peak levels stay dBTP. Differences of one true-peak measurement are dB.
+3. Do not merge into `main`, enable auto-merge, or add CI. The latest recorded local suite is the November 11 git closeout: Ruff, 118 pytest tests, TypeScript, 105 Vitest tests, and the production build, with the existing warnings. This publication-status session did not rerun that suite.
 4. Keep the Milestone 2 acceptance, both exceptions, the Pass 2 and Pass 3 records, the M3 narrative exception, G3, G6, G9, and the original WAV bytes intact.
 
 Protect `m1-v3`, T01–T10 stored data and methods, the original WAV bytes, waveform/transport continuity, lyric draft and revision semantics, evidence labels, and the independent use of Technical Analysis and Lyrics & Inspiration. Album QC compares stored evidence. It does not replace those workspaces or remeasure the masters.
