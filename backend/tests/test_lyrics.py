@@ -478,10 +478,14 @@ def test_existing_m1_database_gains_lyric_tables(tmp_path: Path) -> None:
     conn.close()
     upgraded = connect(database)
     try:
-        assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert upgraded.execute("PRAGMA user_version").fetchone()[0] == 5
         assert upgraded.execute(
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'export_runs'"
         ).fetchone()
+        assert upgraded.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'album_reviews'"
+        ).fetchone()
+        assert upgraded.execute("PRAGMA foreign_key_check").fetchall() == []
         assert upgraded.execute("PRAGMA foreign_keys").fetchone()[0] == 1
         asset = upgraded.execute(
             "SELECT sha256, analysis_status FROM assets WHERE id = 'asset'"

@@ -699,12 +699,29 @@ describe("lyric workspace", () => {
   })
 
   it("does not pick a study when the recording is in two", async () => {
-    api.projects.mockResolvedValue([{ id: "old" }, { id: "new" }])
+    api.projects.mockResolvedValue([
+      { id: "old", mode: "study" },
+      { id: "new", mode: "study" },
+    ])
     api.project.mockImplementation(async (id: string) => ({ id, assets: [{ id: "a" }] }))
     workspace({ projectId: null })
     expect(await screen.findByRole("alert")).toBeTruthy()
     expect(screen.getByRole("alert").textContent).toMatch(/more than one study/)
     expect(api.lyrics).not.toHaveBeenCalled()
+  })
+
+  it("uses the study when the recording is also in an album", async () => {
+    api.projects.mockResolvedValue([
+      { id: "album-1", mode: "album" },
+      { id: "study-1", mode: "study" },
+    ])
+    api.project.mockImplementation(async (id: string) => ({ id, assets: [{ id: "a" }] }))
+    workspace({ projectId: null })
+    await waitFor(() => expect(api.lyrics).toHaveBeenCalledWith("study-1", "a"))
+    const lookedUp = api.project.mock.calls.map((call) => call[0])
+    expect(lookedUp).toContain("study-1")
+    expect(lookedUp).not.toContain("album-1")
+    expect(screen.queryByRole("alert")).toBeNull()
   })
 
   it("does not commit or seek when a region is rebuilt", () => {

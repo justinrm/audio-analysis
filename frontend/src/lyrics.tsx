@@ -332,6 +332,9 @@ async function findProject(assetId: string): Promise<{ id: string } | { id: null
   const projects = await api.projects()
   const matches: string[] = []
   for (const project of projects) {
+    if (project.mode !== "study") {
+      continue
+    }
     const detail = await api.project(project.id)
     if (detail.assets.some((asset) => asset.id === assetId)) {
       matches.push(project.id)

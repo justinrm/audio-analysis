@@ -14,7 +14,8 @@ React 19 and TypeScript. Product contract: `docs/01_TECHNICAL_MVP_SPEC.md` and `
 - T03 is the presentation exception. Stored `y_scale` stays `linear` and the Welch unit stays `dB`. The browser and the PNG renderer show the existing positive-Hz samples on a logarithmic frequency axis. That display adds no spectral samples and does not relabel the unit as dB/Hz. Frequency interaction does not seek.
 - Show chart `status` (`not_run`, `ready`, `not_available`, `failed`) as that status. Show `evidence_class` separately. Do not turn one into the other.
 - Import API shapes from generated OpenAPI types in `frontend/src/api/`. Do not hand-maintain a second copy.
-- The lyrics workspace edits an attached TXT, Markdown, or SRT file. It does not time lyrics from the audio. L01–L05 read stored technical evidence and the current lyric document. Album QC stays an empty state until comparison exists. Do not invent series, peaks, progress, or metrics.
+- Technical Analysis and Lyrics & Inspiration stay independently usable. The lyrics workspace edits an attached TXT, Markdown, or SRT file. It does not time lyrics from the audio. L01–L05 read stored technical evidence and the current lyric document.
+- Album QC is an accepted workspace. It orders existing recordings and does not copy WAV bytes. Comparison and the T11 level overlay read stored `m1-v3` evidence. Batch membership and analysis preparation call the existing endpoints; the worker still measures. A listening status or note is a human judgment, not a detected defect. Keep stored units, evidence labels, and the accepted chart and export contracts. Do not draw the deferred Welch PSD overlay (G9). Do not invent series, peaks, progress, or metrics. This rule does not authorize a later layout or T11 visual change.
 - Extend Vitest when a change would hide a wrong chart, status, or evidence class. A style or copy tweak does not need a new test.
 
 ```tsx

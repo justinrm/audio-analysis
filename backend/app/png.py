@@ -172,6 +172,14 @@ def render_figure(document: dict):
                 (_unit(lines, "LUFS"), "LUFS", None),
             ],
         )
+    if kind == "T11":
+        return _panels(
+            document,
+            [
+                (_unit(lines, "dBFS"), "dBFS", None),
+                (_unit(lines, "LUFS"), "LUFS", None),
+            ],
+        )
     if _unit(lines, "amplitude") and _unit(lines, "dBFS"):
         return _panels(
             document,
@@ -226,6 +234,9 @@ def _pairs(line: dict) -> tuple[list, list]:
 def _paint(document: dict, line: dict, index: int) -> tuple[str, str]:
     unit = line.get("unit") or ""
     kind = document.get("chart_kind")
+    if kind == "T11":
+        palette = [INK, ENERGY, "#d7c4b0", "#a8b0ba"]
+        return palette[index % len(palette)], "-"
     if unit == "LUFS":
         return LUFS_COLOR, "--"
     if unit == "ratio":

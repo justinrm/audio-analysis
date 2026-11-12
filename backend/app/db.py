@@ -15,6 +15,31 @@ def _migrate_v2(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _statements(script: str) -> list[str]:
+    return [part.strip() for part in script.split(";") if part.strip()]
+
+
+def _apply_versioned(conn: sqlite3.Connection, script: str, version: int) -> None:
+    """Apply a migration and its schema version in one transaction."""
+    conn.execute("BEGIN")
+    try:
+        for statement in _statements(script):
+            conn.execute(statement)
+        conn.execute(f"PRAGMA user_version = {int(version)}")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def _migrate_v5(conn: sqlite3.Connection) -> None:
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        _apply_versioned(conn, (MIGRATIONS / "005_album.sql").read_text(), 5)
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
+
+
 class _Rows:
     """Rows already read while the connection lock was held."""
 
@@ -100,6 +125,8 @@ def connect(database: Path) -> sqlite3.Connection:
         conn.executescript((MIGRATIONS / "004_exports.sql").read_text())
         conn.execute("PRAGMA user_version = 4")
         conn.commit()
+    if version < 5:
+        _migrate_v5(conn)
     return conn
 
 

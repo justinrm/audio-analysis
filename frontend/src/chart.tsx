@@ -89,6 +89,9 @@ export function ChartView({
     }
     const built = apply(element.clientWidth)
     plot.getZr().on("click", (event) => {
+      if (chart.chart_kind === "T11") {
+        return
+      }
       const pixel: [number, number] = [event.offsetX, event.offsetY]
       const option = plot.getOption()
       const series = Array.isArray(option.series) ? option.series : []
@@ -170,6 +173,7 @@ export function ChartView({
     heat ||
     chart.chart_kind === "T02" ||
     chart.chart_kind === "T05" ||
+    chart.chart_kind === "T11" ||
     chart.chart_kind === "L03"
   const regions = chart.regions ?? []
   const describedBy = `${chart.chart_kind}-desc`
@@ -413,7 +417,7 @@ function lineGroups(chart: ChartDocument): LineGroup[] {
       { lines: lines.filter((line) => line.unit === "dB"), yName: "Side/mid (dB)" },
     ].filter((group) => group.lines.length > 0)
   }
-  if (chart.chart_kind === "T02" || chart.chart_kind === "L03") {
+  if (chart.chart_kind === "T02" || chart.chart_kind === "L03" || chart.chart_kind === "T11") {
     const dbfs = lines.filter((line) => line.unit === "dBFS")
     const lufs = lines.filter((line) => line.unit === "LUFS")
     const rest = lines.filter((line) => line.unit !== "dBFS" && line.unit !== "LUFS")
@@ -564,7 +568,7 @@ function pushLines(
     nameLocation: "middle",
     nameGap: 52,
     nameTextStyle: NAME,
-    scale: chart.chart_kind === "T02" || chart.chart_kind === "L03" || undefined,
+    scale: chart.chart_kind === "T02" || chart.chart_kind === "L03" || chart.chart_kind === "T11" || undefined,
     min: group.yMin,
     max: group.yMax,
     axisLabel: {

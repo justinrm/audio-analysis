@@ -64,7 +64,8 @@ def test_health(client: TestClient) -> None:
 def test_foreign_keys_on(client: TestClient) -> None:
     connection = client.app.state.db
     assert connection.execute("PRAGMA foreign_keys").fetchone()[0] == 1
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == 4
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute(
             "INSERT INTO project_assets (project_id, asset_id, ordering) VALUES ('missing', 'missing', 0)"
