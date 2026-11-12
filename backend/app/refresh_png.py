@@ -121,7 +121,7 @@ def _plan(sha256: str, analysis: Path, kinds: set[str] | None) -> list[RefreshIt
     manifest = read_manifest(analysis)
     current = (
         manifest is not None
-        and manifest.get("renderer_version") == "png-r1"
+        and manifest.get("renderer_version") == RENDERER_VERSION
         and manifest.get("algorithm_version") == ALGORITHM_VERSION
     )
     items: list[RefreshItem] = []

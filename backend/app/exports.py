@@ -43,8 +43,9 @@ _G3 = (
     "This package does not relabel that measurement."
 )
 _G6 = (
-    "png-r1 images omit bar panels when a line series is present. "
-    "The chart JSON still contains those series."
+    "Technical PNGs in a new package are png-r2 copies. "
+    "Stored bar series are drawn on a separate panel from line series. "
+    "Historical png-r1 files stay on disk and are not copied."
 )
 
 
@@ -342,7 +343,7 @@ def _brief(
         f"Lyric source SHA-256: `{document['source_sha256']}`",
         f"Lyric renderer: {LYRIC_RENDERER_VERSION}.",
         f"Brief template: {BRIEF_TEMPLATE_VERSION}.",
-        "Lyric method: lyrics-v1. Technical renderer: png-r1. Narrative: none.",
+        f"Lyric method: lyrics-v1. Technical renderer: {RENDERER_VERSION}. Narrative: none.",
         f"Lyric text mode: {mode}.",
         (
             "Timing comes from this lyric revision. "
@@ -593,7 +594,7 @@ def _technical_readme(sha: str, metrics: dict | None, document: dict | None, mod
             f"Lyric revision: {revision}",
             f"Lyric text mode: {mode}",
             "",
-            "PNG files are copies of valid png-r1 artifacts.",
+            f"PNG files are copies of valid {RENDERER_VERSION} artifacts.",
             "A chart listed as png_unavailable in the manifest has JSON and no current PNG.",
             "Legacy PNGs are not included.",
             _G3,

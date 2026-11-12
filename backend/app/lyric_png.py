@@ -1,6 +1,6 @@
 """Lyric figure drawings of existing L01–L05 documents.
 
-Renderer identity is separate from analysis version ``m1-v3`` and from ``png-r1``.
+Renderer identity is separate from analysis version ``m1-v3`` and from technical ``png-r2``.
 This module does not draw T01–T10 and does not read audio.
 ``lyric-png-v1`` remains the renderer of already published ZIP snapshots.
 """

@@ -44,7 +44,7 @@ def _close(figure) -> None:
 def test_renderer_versions_stay_separate() -> None:
     assert LYRIC_RENDERER_VERSION == "lyric-png-v2"
     assert BRIEF_TEMPLATE_VERSION == "lyric-brief-v2"
-    assert RENDERER_VERSION == "png-r1"
+    assert RENDERER_VERSION == "png-r2"
     assert ALGORITHM_VERSION == "m1-v3"
 
 
