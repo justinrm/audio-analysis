@@ -4,6 +4,14 @@ Approved direction for the frontend. A design pass is not a product milestone.
 
 For the accepted checkpoint sequence, verification history, and current phase, see [Project status](../../PROJECT_STATUS.md). The [Pass 3 readiness report](studio-precision-pass3.md) is a separate proposal. The Analyzer Readability & Compact Recording Deck Pass was accepted November 8, 2026, and is recorded in project status. This Pass 2 record is unchanged by that decision.
 
+## Evolved direction — approved November 12, 2026
+
+The owner approved **Evolved Studio Precision**: keep the charcoal surfaces, brass accent, and scientific chart grammar, and improve hierarchy, control consistency, chart visibility, navigation, and workflow efficiency. The working principle is one recording identity, one compact transport, one active task, and evidence within reach. Technical Analysis, Lyrics & Inspiration, and Album QC stay independently usable.
+
+That approval does not accept the rest of the November 12 strategy recommendations. The only authorized implementation is Phase 1, control readability and tokens, limited to `frontend/src/styles.css`.
+
+**Phase 1 accepted November 12, 2026.** The owner accepted that stylesheet, including borders and padding on some previously unstyled controls and the 384px listening-note maximum. Acceptance does not certify accessibility and does not authorize Phase 2. The Pass 2 record below is unchanged. Current status is in [NEXT_SESSION.md](../../NEXT_SESSION.md).
+
 ## Pass 2 acceptance
 
 **Studio Precision Pass 2 — Accepted by the owner on 2026-11-06.**
