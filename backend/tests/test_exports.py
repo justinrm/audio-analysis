@@ -149,6 +149,12 @@ def test_analyzed_technical_zip_copies_evidence_without_touching_the_cache(
     _analyze(client, asset_id)
     analysis = settings.data_root / "analysis" / digest / "m1-v3"
     blob = settings.data_root / "blobs" / digest
+    preserved = analysis / "presentation" / "png-r1" / "T02.png"
+    preserved.parent.mkdir(parents=True)
+    preserved.write_bytes(b"png-r1-artifact")
+    published = settings.data_root / "exports" / "already-published.zip"
+    published.parent.mkdir(parents=True)
+    published.write_bytes(b"published-zip-bytes")
     before_analysis = _files(analysis)
     before_blob = blob.read_bytes()
     body, package = _export(client, project_id, asset_id, "technical")
@@ -157,7 +163,7 @@ def test_analyzed_technical_zip_copies_evidence_without_touching_the_cache(
     assert body["export_id"] != again["export_id"]
     assert body["algorithm_version"] == "m1-v3"
     assert body["params_hash"]
-    assert body["renderer_version"] == "png-r1"
+    assert body["renderer_version"] == "png-r2"
     assert body["lyric_renderer_version"] is None
     names = package.namelist()
     assert "technical/metrics.json" in names
@@ -168,7 +174,11 @@ def test_analyzed_technical_zip_copies_evidence_without_touching_the_cache(
     assert b"dB/Hz" not in package.read("technical/charts/T03.json")
     readme = package.read("technical/README.md").decode()
     assert "dB/Hz" in readme
-    assert "png-r1" in readme
+    assert "png-r2" in readme
+    assert "omit bar panels" not in readme
+    assert preserved.read_bytes() == b"png-r1-artifact"
+    assert published.read_bytes() == b"published-zip-bytes"
+    assert b"png-r1-artifact" not in package.read("technical/charts/T02.png")
     assert "technical/charts/T02.png" in names
     assert _png_size(package.read("technical/charts/T02.png"))[0] >= 200
     assert _files(analysis) == before_analysis
@@ -291,6 +301,10 @@ def test_lyric_modes_revision_and_combined_package(
     assert "technical/charts/T01.json" in combined_names
     assert "lyricist/brief.md" in combined_names
     assert combined["lyric_revision"] == 1
+    assert combined["renderer_version"] == "png-r2"
+    assert combined["lyric_renderer_version"] == "lyric-png-v2"
+    assert "png-r2" in combined_zip.read("README.md").decode()
+    assert "lyric-png-v2" in combined_zip.read("lyricist/brief.md").decode()
     edited = client.put(
         f"/api/projects/{project_id}/assets/{asset_id}/lyric-segments/{segment_id}",
         json={"expected_revision": 1, "text": "A different written line"},

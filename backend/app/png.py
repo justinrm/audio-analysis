@@ -1,8 +1,10 @@
 """PNG drawings of stored chart documents. Headless; no display.
 
-Renderer identity is separate from analysis version ``m1-v3``. T03 displays the
-stored positive-Hz samples on a log frequency axis. The chart JSON, including
-``y_scale`` and the ``dB`` unit, is not modified.
+Renderer identity is separate from analysis version ``m1-v3``. ``png-r2`` draws
+a stored bar series on its own panel when a line series is also present.
+``png-r1`` files are left in place. T03 displays the stored positive-Hz samples
+on a log frequency axis. The chart JSON, including ``y_scale`` and the ``dB``
+unit, is not modified.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import FuncFormatter
 
-RENDERER_VERSION = "png-r1"
+RENDERER_VERSION = "png-r2"
 GROUND = "#14171c"
 PANEL = "#1b1f26"
 INK = "#e8e6e1"
@@ -171,6 +173,7 @@ def render_figure(document: dict):
                 (_unit(lines, "dBFS"), "dBFS", None),
                 (_unit(lines, "LUFS"), "LUFS", None),
             ],
+            bars,
         )
     if kind == "T11":
         return _panels(
@@ -189,7 +192,9 @@ def render_figure(document: dict):
             ],
         )
     if kind == "T03":
-        return _spectrum(document, lines)
+        return _spectrum(document, lines, bars)
+    if bars and lines and not heat.get("z"):
+        return _panels(document, [(lines, _line_ylabel(document, lines), None)], bars)
     if bars and not lines and not heat.get("z"):
         return _bars(document, bars)
     return _lines(document, lines)
@@ -281,24 +286,70 @@ def _time_axis(axis, document: dict, which: str) -> None:
             axis.yaxis.set_major_formatter(FuncFormatter(lambda value, _pos: format_file_time(value)))
 
 
-def _panels(document: dict, groups: list[tuple[list, str, tuple[float, float] | None]]):
+def _line_ylabel(document: dict, lines: list) -> str:
+    axis_def = document.get("axis_definitions") or {}
+    ylabel = lines[0].get("unit") if lines else axis_def.get("y") or ""
+    if ylabel == "score":
+        return str(axis_def.get("y") or ylabel)
+    return str(ylabel)
+
+
+def _bar_ylabel(document: dict) -> str:
+    kind = document.get("chart_kind")
+    if kind == "T06":
+        return "Autocorrelation"
+    if kind == "T07":
+        return "Share"
+    return str((document.get("axis_definitions") or {}).get("y") or "")
+
+
+def _panels(
+    document: dict,
+    groups: list[tuple[list, str, tuple[float, float] | None]],
+    bars: list | None = None,
+):
     present = [group for group in groups if group[0]]
+    bar_items = list(bars or [])
     if not present:
+        if bar_items:
+            return _bars(document, bar_items)
         figure, axes = plt.subplots(figsize=(8.2, 3.6), dpi=100)
         _style_figure(figure)
         _style_axis(axes)
         axes.set_title(_title(document))
         return figure
-    figure, axes = plt.subplots(
-        len(present),
-        1,
-        sharex=True,
-        squeeze=False,
-        figsize=(8.2, 2.5 * len(present)),
-        dpi=100,
-    )
+    if not bar_items:
+        figure, axes = plt.subplots(
+            len(present),
+            1,
+            sharex=True,
+            squeeze=False,
+            figsize=(8.2, 2.5 * len(present)),
+            dpi=100,
+        )
+        _style_figure(figure)
+        for axis, (lines, ylabel, bounds) in zip(axes[:, 0], present, strict=True):
+            _style_axis(axis)
+            _plot_lines(axis, document, lines)
+            _mark_time(axis, document)
+            _time_axis(axis, document, "x")
+            axis.set_ylabel(ylabel)
+            if bounds is not None:
+                axis.set_ylim(*bounds)
+        axes[0, 0].set_title(_title(document))
+        x_name = str((document.get("axis_definitions") or {}).get("x") or "")
+        axes[-1, 0].set_xlabel(x_name)
+        figure.tight_layout()
+        return figure
+    figure = plt.figure(figsize=(8.2, 2.5 * len(present) + 3.4), dpi=100)
     _style_figure(figure)
-    for axis, (lines, ylabel, bounds) in zip(axes[:, 0], present, strict=True):
+    grid = figure.add_gridspec(len(present) + 1, 1, height_ratios=[2.5] * len(present) + [3.4])
+    share = None
+    line_axes = []
+    for index, (lines, ylabel, bounds) in enumerate(present):
+        axis = figure.add_subplot(grid[index, 0], sharex=share)
+        share = axis
+        line_axes.append(axis)
         _style_axis(axis)
         _plot_lines(axis, document, lines)
         _mark_time(axis, document)
@@ -306,16 +357,17 @@ def _panels(document: dict, groups: list[tuple[list, str, tuple[float, float] | 
         axis.set_ylabel(ylabel)
         if bounds is not None:
             axis.set_ylim(*bounds)
-    axes[0, 0].set_title(_title(document))
+    bar_axis = figure.add_subplot(grid[len(present), 0])
+    _style_axis(bar_axis)
+    _paint_bars(bar_axis, document, bar_items)
+    line_axes[0].set_title(_title(document))
     x_name = str((document.get("axis_definitions") or {}).get("x") or "")
-    axes[-1, 0].set_xlabel(x_name)
+    line_axes[-1].set_xlabel(x_name)
     figure.tight_layout()
     return figure
 
 
-def _spectrum(document: dict, lines: list):
-    figure, axis = plt.subplots(figsize=(8.2, 3.6), dpi=100)
-    _style_figure(figure)
+def _paint_spectrum(axis, document: dict, lines: list) -> None:
     _style_axis(axis)
     _plot_lines(axis, document, lines)
     positive = [x for line in lines for x in line["x"] if x > 0]
@@ -327,21 +379,41 @@ def _spectrum(document: dict, lines: list):
     axis.set_xlabel(axis_def.get("x") or "")
     axis.set_ylabel(lines[0].get("unit") if lines else "")
     axis.set_title(_title(document))
+
+
+def _spectrum(document: dict, lines: list, bars: list | None = None):
+    bar_items = list(bars or [])
+    if not bar_items:
+        figure, axis = plt.subplots(figsize=(8.2, 3.6), dpi=100)
+        _style_figure(figure)
+        _paint_spectrum(axis, document, lines)
+        figure.tight_layout()
+        return figure
+    figure = plt.figure(figsize=(8.2, 7.0), dpi=100)
+    _style_figure(figure)
+    grid = figure.add_gridspec(2, 1, height_ratios=[3.6, 3.4])
+    _paint_spectrum(figure.add_subplot(grid[0, 0]), document, lines)
+    bar_axis = figure.add_subplot(grid[1, 0])
+    _style_axis(bar_axis)
+    _paint_bars(bar_axis, document, bar_items)
     figure.tight_layout()
     return figure
+
+
+def _paint_bars(axis, document: dict, bars: list) -> None:
+    color = ESTIMATED if document.get("evidence_class") == "estimated" else ENERGY
+    axis.bar([item["label"] for item in bars], [item["value"] for item in bars], color=color)
+    axis.tick_params(axis="x", labelrotation=45 if len(bars) > 6 else 0, labelsize=7)
+    if document.get("chart_kind") == "T07":
+        axis.set_ylim(0, 1)
+    axis.set_ylabel(_bar_ylabel(document))
 
 
 def _bars(document: dict, bars: list):
     figure, axis = plt.subplots(figsize=(8.2, 3.6), dpi=100)
     _style_figure(figure)
     _style_axis(axis)
-    color = ESTIMATED if document.get("evidence_class") == "estimated" else ENERGY
-    axis.bar([item["label"] for item in bars], [item["value"] for item in bars], color=color)
-    axis.tick_params(axis="x", labelrotation=45 if len(bars) > 6 else 0, labelsize=7)
-    if document.get("chart_kind") == "T07":
-        axis.set_ylim(0, 1)
-    axis_def = document.get("axis_definitions") or {}
-    axis.set_ylabel("Share" if document.get("chart_kind") == "T07" else axis_def.get("y") or "")
+    _paint_bars(axis, document, bars)
     axis.set_title(_title(document))
     if document.get("chart_kind") == "T10":
         figure.text(
@@ -366,10 +438,7 @@ def _lines(document: dict, lines: list):
     _time_axis(axis, document, "x")
     axis_def = document.get("axis_definitions") or {}
     axis.set_xlabel(axis_def.get("x") or "")
-    ylabel = lines[0].get("unit") if lines else axis_def.get("y") or ""
-    if ylabel == "score":
-        ylabel = axis_def.get("y") or ylabel
-    axis.set_ylabel(ylabel)
+    axis.set_ylabel(_line_ylabel(document, lines))
     axis.set_title(_title(document))
     figure.tight_layout()
     return figure

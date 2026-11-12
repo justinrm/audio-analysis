@@ -86,6 +86,7 @@ def test_coordinated_axes_do_not_change_the_document() -> None:
         lines=[{"name": "Onset strength", "unit": "score", "x": [0, 1], "y": [0.2, 0.4]}],
         bars=[{"label": "122.3 BPM (double-time)", "value": 0.8}],
     )
+    pulse["axis_definitions"] = {"x": "Time (s)", "y": "Onset strength", "y_scale": "linear"}
     heat = _document(
         "T04",
         lines=[{"name": "bass", "unit": "dB rel. median", "x": [0, 2], "y": [-3, -1]}],
@@ -95,16 +96,27 @@ def test_coordinated_axes_do_not_change_the_document() -> None:
     before = json.dumps([loudness, spectrum, stereo, share, pulse, heat])
 
     loudness_figure = render_figure(loudness)
-    assert [axis.get_ylabel() for axis in loudness_figure.axes] == ["dBFS", "LUFS"]
+    assert [axis.get_ylabel() for axis in loudness_figure.axes] == [
+        "dBFS",
+        "LUFS",
+        "Relative RMS-power level (dB)",
+    ]
+    assert list(loudness_figure.axes[0].lines[0].get_ydata()) == [-20, -10]
     assert list(loudness_figure.axes[1].lines[0].get_ydata()) == [-16, -9]
     assert loudness_figure.axes[0].containers == []
+    assert list(loudness_figure.axes[2].containers[0].datavalues) == [0.4]
+    assert loudness_figure.axes[2].get_xscale() == "linear"
     _close(loudness_figure)
 
     spectrum_figure = render_figure(spectrum)
     assert spectrum_figure.axes[0].get_xscale() == "log"
     assert spectrum_figure.axes[0].get_ylabel() == "dB"
+    assert spectrum_figure.axes[1].get_ylabel() == "Power share (%)"
+    assert spectrum_figure.axes[1].get_xscale() == "linear"
     assert list(spectrum_figure.axes[0].lines[0].get_xdata()) == [20, 1000, 8000]
+    assert list(spectrum_figure.axes[0].lines[0].get_ydata()) == [-80, -40, -20]
     assert spectrum_figure.axes[0].containers == []
+    assert list(spectrum_figure.axes[1].containers[0].datavalues) == [12.5]
     _close(spectrum_figure)
 
     stereo_figure = render_figure(stereo)
@@ -117,7 +129,10 @@ def test_coordinated_axes_do_not_change_the_document() -> None:
     _close(share_figure)
 
     pulse_figure = render_figure(pulse)
-    assert all(len(axis.containers) == 0 for axis in pulse_figure.axes)
+    assert [axis.get_ylabel() for axis in pulse_figure.axes] == ["Onset strength", "Autocorrelation"]
+    assert list(pulse_figure.axes[0].lines[0].get_ydata()) == [0.2, 0.4]
+    assert pulse_figure.axes[0].containers == []
+    assert list(pulse_figure.axes[1].containers[0].datavalues) == [0.8]
     _close(pulse_figure)
 
     heat_figure = render_figure(heat)
@@ -129,6 +144,44 @@ def test_coordinated_axes_do_not_change_the_document() -> None:
     assert json.dumps([loudness, spectrum, stereo, share, pulse, heat]) == before
     assert spectrum["axis_definitions"]["y_scale"] == "linear"
     assert spectrum["series"]["lines"][0]["unit"] == "dB"
+    assert "dB/Hz" not in json.dumps(spectrum)
+
+
+def test_t11_stays_two_level_panels() -> None:
+    document = _document(
+        "T11",
+        lines=[
+            {"name": "1. A — 1 s RMS", "unit": "dBFS", "x": [0, 1], "y": [-12, -10]},
+            {"name": "1. A — 3 s short-term LUFS", "unit": "LUFS", "x": [0, 1], "y": [-14, -13]},
+        ],
+    )
+    figure = render_figure(document)
+    assert [axis.get_ylabel() for axis in figure.axes] == ["dBFS", "LUFS"]
+    assert all(axis.containers == [] for axis in figure.axes)
+    assert list(figure.axes[0].lines[0].get_ydata()) == [-12, -10]
+    _close(figure)
+
+
+def test_empty_bar_series_adds_no_panel() -> None:
+    document = _document(
+        "T03",
+        lines=[{"name": "Welch PSD", "unit": "dB", "x": [20, 1000], "y": [-80, -40]}],
+        bars=[],
+    )
+    document["axis_definitions"] = {"x": "Frequency (Hz)", "y": "Power share (%)", "y_scale": "linear"}
+    figure = render_figure(document)
+    assert len(figure.axes) == 1
+    assert figure.axes[0].containers == []
+    assert figure.axes[0].get_ylabel() == "dB"
+    _close(figure)
+
+
+def test_unavailable_chart_writes_no_png(tmp_path: Path) -> None:
+    document = _document("T02", lines=[{"name": "1 s RMS", "unit": "dBFS", "x": [1], "y": [-12]}])
+    document["status"] = "not_available"
+    path = tmp_path / "T02.png"
+    publish_png(path, document)
+    assert not path.exists()
 
 
 def test_publish_replaces_only_a_valid_png(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -167,6 +220,9 @@ def test_refresh_is_versioned_and_does_not_touch_evidence(tmp_path: Path, monkey
     analysis = _ready_tree(tmp_path, sha, {"T10": document})
     legacy = analysis / "T10.png"
     legacy.write_bytes(b"\x89PNG\r\n\x1a\nlegacy")
+    preserved = analysis / "presentation" / "png-r1" / "T10.png"
+    preserved.parent.mkdir(parents=True)
+    preserved.write_bytes(b"png-r1-artifact")
     json_before = (analysis / "T10.json").read_bytes()
     metrics_before = (analysis / "metrics.json").read_bytes()
     blob_before = (tmp_path / "blobs" / sha).read_bytes()
@@ -178,14 +234,18 @@ def test_refresh_is_versioned_and_does_not_touch_evidence(tmp_path: Path, monkey
 
     dry = refresh_tree(tmp_path, dry_run=True, sha256=sha, kinds={"T10"})
     assert [(item.kind, item.action) for item in dry] == [("T10", "dry-run")]
-    assert not (analysis / "presentation").exists()
+    assert preserved.read_bytes() == b"png-r1-artifact"
+    assert not (analysis / "presentation" / RENDERER_VERSION).exists()
     assert (analysis / "T10.json").read_bytes() == json_before
 
     first = refresh_tree(tmp_path, sha256=sha, kinds={"T10"})
     assert [(item.kind, item.action) for item in first] == [("T10", "regenerated")]
     current = presentation_png(analysis, "T10")
+    assert RENDERER_VERSION == "png-r2"
+    assert current == analysis / "presentation" / "png-r2" / "T10.png"
     assert valid_png(current)
     assert rendered_png(analysis, "T10") == current
+    assert preserved.read_bytes() == b"png-r1-artifact"
     assert legacy.read_bytes().startswith(b"\x89PNG")
     assert (analysis / "T10.json").read_bytes() == json_before
     assert (analysis / "metrics.json").read_bytes() == metrics_before
@@ -215,6 +275,7 @@ def test_refresh_is_versioned_and_does_not_touch_evidence(tmp_path: Path, monkey
     failed = refresh_tree(tmp_path, sha256=sha, kinds={"T10"})
     assert failed[0].action == "failed"
     assert current.read_bytes() == previous
+    assert preserved.read_bytes() == b"png-r1-artifact"
     assert (analysis / "T10.json").read_bytes() == json_before
     assert rendered_png(analysis, "T10") is None
 

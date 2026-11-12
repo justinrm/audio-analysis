@@ -144,9 +144,9 @@ Interactive charts are ECharts drawings of the stored chart document. A ready ch
 
 Mono T05 is `not_available` / `not_applicable`. A right channel is not invented. T10 markers are checkpoints. They are not a finding that a click or a clip is audible. T06–T09 stay estimates: half-time and double-time are hypotheses, pitch-class candidates are not a chord chart, change points are not verified sections, and similar spectra are not the same melody.
 
-The worker writes a PNG for each ready chart when rendering succeeds. Current images use renderer `png-r1` at `analysis/{sha256}/m1-v3/presentation/png-r1/`. A failed render leaves the chart data in place. A missing or invalid `png-r1` file is `png_unavailable`. The image route does not substitute an older PNG, and export does not invent one. Refresh instructions are under [Configuration and development](#configuration-and-development).
+The worker writes a PNG for each ready chart when rendering succeeds. Current images use renderer `png-r2` at `analysis/{sha256}/m1-v3/presentation/png-r2/`. A failed render leaves the chart data in place. A missing or invalid `png-r2` file is `png_unavailable`. The image route does not substitute a `png-r1` file, and export does not invent one. Refresh instructions are under [Configuration and development](#configuration-and-development).
 
-Stored T03 power is still labeled `dB`, not dB/Hz. Some `png-r1` figures omit bar panels when a line series is present; the chart JSON still contains those series. Those gaps are G3 and G6 in the [decision register](docs/OPEN_DECISIONS_AND_UNCERTAINTIES.md). Chart zoom remaining local to the chart is G4.
+Stored T03 power is still labeled `dB`, not dB/Hz. That gap is G3 in the [decision register](docs/OPEN_DECISIONS_AND_UNCERTAINTIES.md). `png-r2` draws a stored bar series on its own panel when a line series is also present. Historical `png-r1` files stay in their directory. The owner accepted that G6 correction on November 12, 2026. Existing analyses need an explicit `png-r2` refresh, and already published ZIP bytes stay in place. A low-sample-rate T03 band can still read `10000–8000 Hz` from the stored chart. Chart zoom remaining local to the chart is G4.
 
 ## Lyrics & Inspiration
 
@@ -185,9 +185,9 @@ Export does not decode the WAV, remeasure, or rewrite the analysis cache. A reco
 
 | Profile | Requires | What you take away |
 | --- | --- | --- |
-| Technical ZIP | A supported WAV in a study. Lyrics are optional. | Stored `m1-v3` metrics and evidence, T01–T10 chart JSON, and each technical PNG whose `png-r1` manifest validates. Missing or invalid images are listed as `png_unavailable`. |
+| Technical ZIP | A supported WAV in a study. Lyrics are optional. | Stored `m1-v3` metrics and evidence, T01–T10 chart JSON, and each technical PNG whose `png-r2` manifest validates. Missing or invalid images are listed as `png_unavailable`. |
 | Lyricist ZIP | That recording plus a saved lyric document. | L01–L05 chart JSON, static L01–L05 figures, and a Markdown reference brief rendered from those documents. |
-| Combined ZIP | That recording plus a saved lyric document. | Technical chart JSON and valid `png-r1` images under `technical/charts/`, plus the lyricist charts, figures, and brief. `metrics.json`, once at the archive root, is the stored technical metrics. `evidence.json`, once at the root, is the lyric evidence bundle for that revision. |
+| Combined ZIP | That recording plus a saved lyric document. | Technical chart JSON and valid `png-r2` images under `technical/charts/`, plus the lyricist charts, figures, and brief. `metrics.json`, once at the archive root, is the stored technical metrics. `evidence.json`, once at the root, is the lyric evidence bundle for that revision. |
 
 The lyric-text control has three modes. The default is `summarized`.
 
@@ -199,11 +199,11 @@ The lyric-text control has three modes. The default is `summarized`.
 
 A Technical ZIP does not contain lyric charts or lyric lines. The selected mode is still recorded on its manifest.
 
-New lyric figures declare `lyric-png-v2`. New briefs declare `lyric-brief-v2`. Technical images stay `png-r1`. The manifest records `narrative: none`. Package READMEs name `m1-v3` when metrics exist, the source SHA-256, the lyric revision, the lyric-text mode, and the open T03 unit and mixed-panel PNG limits.
+New lyric figures declare `lyric-png-v2`. New briefs declare `lyric-brief-v2`. New technical images declare `png-r2`. The manifest records `narrative: none`. Package READMEs name `m1-v3` when metrics exist, the source SHA-256, the lyric revision, the lyric-text mode, and the open T03 unit. Historical `png-r1` files are not copied.
 
 A published ZIP is left as stored. A later lyric save creates a new export at the new revision and leaves the previous file unchanged. Packages already published as `lyric-png-v1` are not rewritten to `lyric-png-v2`.
 
-The manifest `content_sha256` covers the sorted chart JSON, evidence JSON, metrics JSON, and brief. It excludes `created_at`, the export id, README files, and PNG bytes. Repeating an export from the same stored inputs keeps that hash. Lyric PNGs are drawn when the package is built, so the hash does not promise pixel-identical figures, and the ZIP bytes are not claimed to match across machines or Matplotlib builds. Technical PNGs that are included are copies of the stored `png-r1` files.
+The manifest `content_sha256` covers the sorted chart JSON, evidence JSON, metrics JSON, and brief. It excludes `created_at`, the export id, README files, and PNG bytes. Repeating an export from the same stored inputs keeps that hash. Lyric PNGs are drawn when the package is built, so the hash does not promise pixel-identical figures, and the ZIP bytes are not claimed to match across machines or Matplotlib builds. Technical PNGs that are included are copies of the stored `png-r2` files. A new lyric brief names that technical renderer, so its content hash differs from a brief written when the technical renderer was `png-r1`. Already published ZIP bytes are not rewritten.
 
 If publication is interrupted after the ZIP file is written and before the database row is stored, `exports/{id}.zip` can exist without being listed. That file is not a completed export.
 
@@ -267,7 +267,7 @@ cd backend
 uv run python -m app.refresh_png --data-root PATH
 ```
 
-`--dry-run`, `--sha256`, and repeatable `--kind` are optional. A current image response sends `X-Renderer-Version: png-r1` and `Cache-Control: no-cache`.
+`--dry-run`, `--sha256`, and repeatable `--kind` are optional. Refresh writes `png-r2` from stored chart JSON and does not decode the WAV or remeasure. It does not overwrite `presentation/png-r1/`. A current image response sends `X-Renderer-Version: png-r2` and `Cache-Control: no-cache`. Until that refresh, the image route returns `png_unavailable` and does not serve a `png-r1` file.
 
 ### Checks
 
@@ -306,7 +306,7 @@ Charts are statements about a file under a named method. They are not a validate
 - Each chart document names its method and `method_version`. Builders fill sample rate and hop on the charts that have them. T02 leaves `hop_s` empty and names its windows on the series.
 - The export content hash does not promise identical PNG pixels. See [Export packages](#export-packages).
 
-Native keyboard activation of the chart data tables was not fully verified in browser review. Short recordings may omit T08 and T09. The unlisted-ZIP window is described with the export profiles. Engineering discrepancies, including G3, G4, and G6, are tracked in the [decision register](docs/OPEN_DECISIONS_AND_UNCERTAINTIES.md) and [project status](PROJECT_STATUS.md).
+Native keyboard activation of the chart data tables was not fully verified in browser review. Short recordings may omit T08 and T09. The unlisted-ZIP window is described with the export profiles. Engineering discrepancies that remain include G3, G4, and G9. G6 is accepted as `png-r2` with the limitations in the [decision register](docs/OPEN_DECISIONS_AND_UNCERTAINTIES.md) and [project status](PROJECT_STATUS.md).
 
 ## Status and documentation
 

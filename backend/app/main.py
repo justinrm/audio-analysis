@@ -424,7 +424,7 @@ class ExportManifest(BaseModel):
     source_sha256: str
     algorithm_version: str | None
     params_hash: str | None
-    renderer_version: Literal["png-r1"]
+    renderer_version: Literal["png-r2"]
     lyric_renderer_version: Literal["lyric-png-v2"] | None
     brief_template_version: Literal["lyric-brief-v2"] | None
     lyric_document_id: str | None
