@@ -21,6 +21,38 @@
   --color-brass-deep: #8c6d3e;
 }
 
+/* Aliases of the palette above. brass-deep on brass-ink is 3.8:1, so it is not an action fill. */
+:root {
+  --color-canvas: var(--color-ground);
+  --color-navigation: var(--color-rail);
+  --color-surface: var(--color-panel);
+  --color-text: var(--color-ink);
+  --color-text-muted: var(--color-secondary);
+  --color-accent: var(--color-brass);
+  --color-on-accent: var(--color-brass-ink);
+  --color-accent-hover: var(--color-brass-hover);
+  --color-border: var(--color-line);
+  --color-border-quiet: var(--color-rule);
+  --color-danger: var(--color-failed);
+  --color-caution: var(--color-warning);
+  --control-action-bg: var(--color-accent);
+  --control-action-fg: var(--color-on-accent);
+  --control-action-bg-hover: var(--color-accent-hover);
+  --control-ghost-fg: var(--color-text);
+  --control-ghost-bg-hover: var(--color-surface);
+  --control-ghost-border: var(--color-border);
+  --control-selected-bg: var(--color-accent);
+  --control-selected-fg: var(--color-on-accent);
+  --control-selected-bg-hover: var(--color-accent-hover);
+  --control-selected-quiet-bg: var(--color-surface);
+  --control-selected-quiet-fg: var(--color-text);
+  --control-focus: var(--color-accent);
+  --control-disabled-opacity: 0.45;
+  --control-field-bg: var(--color-surface);
+  --control-field-fg: var(--color-text);
+  --control-field-border: var(--color-border);
+}
+
 html,
 body,
 #root {
@@ -50,7 +82,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-brass);
+  outline: 2px solid var(--control-focus);
   outline-offset: 2px;
 }
 
@@ -181,9 +213,17 @@ textarea {
   cursor: pointer;
 }
 
-.deck-toggle[aria-expanded="false"] {
-  border-color: var(--color-brass);
-  color: var(--color-brass);
+.deck-toggle:hover,
+.deck-toggle:active {
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.deck-toggle[aria-expanded="false"],
+.deck-toggle[aria-expanded="false"]:hover,
+.deck-toggle[aria-expanded="false"]:active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .deck.is-compact {
@@ -330,10 +370,17 @@ textarea {
   color: var(--color-secondary);
 }
 
-.line-cue[aria-current="true"] {
-  color: var(--color-ink);
-  background: var(--color-rail);
-  box-shadow: inset 2px 0 0 var(--color-brass);
+.line-cue:hover,
+.line-cue:active {
+  color: var(--color-text);
+}
+
+.line-cue[aria-current="true"],
+.line-cue[aria-current="true"]:hover,
+.line-cue[aria-current="true"]:active {
+  color: var(--color-text);
+  background: var(--color-navigation);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .line-cue[data-playing="true"] {
@@ -387,12 +434,6 @@ textarea {
   border: 1px solid var(--color-line);
   border-radius: 2px;
   padding: 0.35rem 0.5rem;
-}
-
-.line-list input:focus {
-  outline: 2px solid var(--color-brass);
-  outline-offset: 2px;
-  border-color: var(--color-brass);
 }
 
 .evidence {
@@ -486,10 +527,12 @@ textarea {
   background: var(--color-panel);
 }
 
-.nav button[aria-current="page"] {
-  color: var(--color-ink);
-  background: var(--color-panel);
-  box-shadow: inset 2px 0 0 var(--color-brass);
+.nav button[aria-current="page"],
+.nav button[aria-current="page"]:hover,
+.nav button[aria-current="page"]:active {
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .stage {
@@ -726,10 +769,17 @@ textarea {
   margin: 0.75rem 0 1rem;
 }
 
-.album-tabs button[aria-selected="true"] {
-  background: var(--color-brass);
-  color: var(--color-brass-ink);
-  border-color: var(--color-brass);
+.album-tabs button[aria-selected="true"],
+.album-tabs button[aria-selected="true"]:hover:not(:disabled),
+.album-tabs button[aria-selected="true"]:active:not(:disabled) {
+  background: var(--control-selected-bg);
+  color: var(--control-selected-fg);
+  border-color: var(--color-accent);
+}
+
+.album-tabs button[aria-selected="true"]:hover:not(:disabled),
+.album-tabs button[aria-selected="true"]:active:not(:disabled) {
+  background: var(--control-selected-bg-hover);
 }
 
 .album-audition {
@@ -783,37 +833,75 @@ textarea {
 }
 
 .action,
-.ghost {
+.ghost,
+.chart-data-pages button,
+.album-bar > button:not(.action):not(.ghost) {
   border-radius: 2px;
   cursor: pointer;
 }
 
 .action {
-  background: var(--color-brass);
-  color: var(--color-brass-ink);
+  background: var(--control-action-bg);
+  color: var(--control-action-fg);
   border: 0;
   padding: 0.4rem 0.7rem;
 }
 
-.action:hover:not(:disabled) {
-  background: var(--color-brass-hover);
+.action:hover:not(:disabled),
+.action:active:not(:disabled) {
+  background: var(--control-action-bg-hover);
+  color: var(--control-action-fg);
 }
 
 .action:disabled,
-.ghost:disabled {
-  opacity: 0.45;
+.ghost:disabled,
+.chart-data-pages button:disabled,
+.album-bar > button:disabled {
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
-.ghost {
+.ghost,
+.chart-data-pages button,
+.album-bar > button:not(.action):not(.ghost) {
   background: transparent;
-  color: var(--color-ink);
-  border: 1px solid var(--color-line);
+  color: var(--control-ghost-fg);
+  border: 1px solid var(--control-ghost-border);
   padding: 0.35rem 0.6rem;
 }
 
-.ghost:hover:not(:disabled) {
-  background: var(--color-panel);
+.ghost:hover:not(:disabled),
+.ghost:active:not(:disabled),
+.chart-data-pages button:hover:not(:disabled),
+.chart-data-pages button:active:not(:disabled),
+.album-bar > button:not(.action):not(.ghost):hover:not(:disabled),
+.album-bar > button:not(.action):not(.ghost):active:not(:disabled) {
+  background: var(--control-ghost-bg-hover);
+  color: var(--control-ghost-fg);
+}
+
+.ghost[aria-pressed="true"],
+.ghost[aria-pressed="true"]:hover:not(:disabled),
+.ghost[aria-pressed="true"]:active:not(:disabled),
+.album-bar > button:not(.action):not(.ghost)[aria-pressed="true"],
+.album-bar > button:not(.action):not(.ghost)[aria-pressed="true"]:hover:not(:disabled),
+.album-bar > button:not(.action):not(.ghost)[aria-pressed="true"]:active:not(:disabled) {
+  background: var(--control-selected-quiet-bg);
+  color: var(--control-selected-quiet-fg);
+  border-color: var(--color-accent);
+}
+
+.ghost[aria-selected="true"],
+.ghost[aria-selected="true"]:hover:not(:disabled),
+.ghost[aria-selected="true"]:active:not(:disabled) {
+  background: var(--control-selected-bg);
+  color: var(--control-selected-fg);
+  border-color: var(--color-accent);
+}
+
+.ghost[aria-selected="true"]:hover:not(:disabled),
+.ghost[aria-selected="true"]:active:not(:disabled) {
+  background: var(--control-selected-bg-hover);
 }
 
 .field {
@@ -831,15 +919,41 @@ textarea {
 }
 
 .field input[type="text"],
+.field input:not([type]),
 .field select,
 .lyric-row textarea,
 .lyric-times input,
 .note-form input,
-.note-form textarea {
-  background: var(--color-panel);
-  border: 1px solid var(--color-line);
+.note-form textarea,
+#album-panel-listening input,
+.album-pairs select {
+  background: var(--control-field-bg);
+  color: var(--control-field-fg);
+  border: 1px solid var(--control-field-border);
   border-radius: 2px;
   padding: 0.4rem 0.55rem;
+}
+
+#album-panel-listening input {
+  width: min(100%, 24rem);
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.lyric-row textarea:focus-visible,
+.lyric-times input:focus-visible,
+.note-form input:not([type="checkbox"]):focus-visible,
+.note-form textarea:focus-visible,
+#album-panel-listening input:focus-visible,
+.line-list input:focus-visible,
+.album-dialog input:focus-visible,
+.album-dialog select:focus-visible,
+.album-pairs select:focus-visible,
+.chart-picker select:focus-visible,
+.chart-data-pages input:focus-visible {
+  border-color: var(--control-focus);
+  outline: 2px solid var(--control-focus);
+  outline-offset: 2px;
 }
 
 .feedback {
@@ -867,9 +981,16 @@ textarea {
   cursor: pointer;
 }
 
-.tabs button[aria-selected="true"] {
-  color: var(--color-ink);
-  border-bottom-color: var(--color-brass);
+.tabs button:hover,
+.tabs button:active {
+  color: var(--color-text);
+}
+
+.tabs button[aria-selected="true"],
+.tabs button[aria-selected="true"]:hover,
+.tabs button[aria-selected="true"]:active {
+  color: var(--color-text);
+  border-bottom-color: var(--color-accent);
 }
 
 .category {
@@ -885,9 +1006,16 @@ textarea {
   color: var(--color-secondary);
 }
 
-.category[aria-current="true"] {
-  color: var(--color-ink);
-  box-shadow: inset 2px 0 0 var(--color-brass);
+.category:hover,
+.category:active {
+  color: var(--color-text);
+}
+
+.category[aria-current="true"],
+.category[aria-current="true"]:hover,
+.category[aria-current="true"]:active {
+  color: var(--color-text);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .category small,
@@ -1014,6 +1142,11 @@ textarea {
 .chart-data-pages input {
   width: 4rem;
   margin-left: 0.35rem;
+  background: var(--control-field-bg);
+  color: var(--control-field-fg);
+  border: 1px solid var(--control-field-border);
+  border-radius: 2px;
+  padding: 0.2rem 0.35rem;
 }
 
 .markers {
