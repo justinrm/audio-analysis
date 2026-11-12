@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react"
+import { AlbumHome, AlbumWorkspace } from "./album"
 import { Analyzer } from "./analyzer"
 import { Library } from "./library"
 
 type Route =
   | { name: "library" }
   | { name: "analyzer"; assetId: string | null; projectId: string | null }
-  | { name: "album" }
+  | { name: "album"; projectId: string | null }
   | { name: "settings" }
 
 function readRoute(): Route {
@@ -18,7 +19,7 @@ function readRoute(): Route {
     }
   }
   if (url.pathname === "/album") {
-    return { name: "album" }
+    return { name: "album", projectId: url.searchParams.get("project") }
   }
   if (url.pathname === "/settings") {
     return { name: "settings" }
@@ -44,11 +45,10 @@ function page(route: Route, go: (next: string) => void) {
         </>
       )
     case "album":
-      return (
-        <>
-          <h1 className="page-title">Album QC</h1>
-          <p>Comparison is not in this milestone. Study one recording in the analyzer until then.</p>
-        </>
+      return route.projectId ? (
+        <AlbumWorkspace projectId={route.projectId} onInspect={(assetId) => go(`/analyzer?asset=${assetId}`)} />
+      ) : (
+        <AlbumHome onOpen={(projectId) => go(`/album?project=${projectId}`)} />
       )
     case "settings":
       return (
@@ -84,7 +84,7 @@ export function App() {
     <div className="shell">
       <aside className="rail">
         <p className="mark">Reference</p>
-        <p className="quiet mt-2 mb-0">A room for one recording at a time.</p>
+        <p className="quiet mt-2 mb-0">A room for one recording, and for comparing a set.</p>
         <nav className="nav" aria-label="Primary">
           <button type="button" aria-current={route.name === "library" ? "page" : undefined} onClick={() => go("/")}>
             Library

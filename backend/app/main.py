@@ -14,6 +14,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
+from app.album import (
+    AlbumError,
+    AlbumExportManifest,
+    ComparisonDocument,
+    ReviewRecord,
+    add_member,
+    build_comparison,
+    open_album_export,
+    publish_album_export,
+    remove_member,
+    reorder,
+    review_view,
+    save_review,
+)
 from app.audio import (
     CONVERSION_VERSION,
     WavRejected,
@@ -82,14 +96,30 @@ class Health(BaseModel):
 
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
+    mode: Literal["study", "album"] = "study"
 
 
 class Project(BaseModel):
     id: str
     name: str
-    mode: Literal["study"]
+    mode: Literal["study", "album"]
     created_at: str
     updated_at: str
+
+
+class MemberCreate(BaseModel):
+    asset_id: str
+
+
+class AlbumOrder(BaseModel):
+    asset_ids: list[str]
+
+
+class ReviewUpdate(BaseModel):
+    asset_id: str
+    checkpoint_id: str
+    status: str
+    note: str = ""
 
 
 class Asset(BaseModel):
@@ -432,6 +462,10 @@ def _lyric(exc: LyricError) -> AppError:
     return AppError(exc.status, exc.code, exc.message, exc.extra)
 
 
+def _album(exc: AlbumError) -> AppError:
+    return AppError(exc.status, exc.code, exc.message)
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -566,8 +600,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         now = _now()
         project_id = str(uuid.uuid4())
         connection.execute(
-            "INSERT INTO projects (id, name, mode, created_at, updated_at) VALUES (?, ?, 'study', ?, ?)",
-            (project_id, name, now, now),
+            "INSERT INTO projects (id, name, mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            (project_id, name, body.mode, now, now),
         )
         connection.commit()
         row = connection.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
@@ -593,9 +627,83 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         project["assets"] = [asset_dict(row) for row in rows]
         return project
 
+    @app.post("/api/projects/{project_id}/members")
+    def create_member(project_id: str, body: MemberCreate) -> dict:
+        try:
+            return add_member(connection, project_id, body.asset_id)
+        except AlbumError as exc:
+            raise _album(exc) from exc
+
+    @app.delete("/api/projects/{project_id}/members/{asset_id}", status_code=204)
+    def delete_member(project_id: str, asset_id: str) -> Response:
+        try:
+            remove_member(connection, project_id, asset_id)
+        except AlbumError as exc:
+            raise _album(exc) from exc
+        return Response(status_code=204)
+
+    @app.put("/api/projects/{project_id}/order")
+    def order_members(project_id: str, body: AlbumOrder) -> dict:
+        try:
+            return reorder(connection, project_id, body.asset_ids)
+        except AlbumError as exc:
+            raise _album(exc) from exc
+
+    @app.get("/api/projects/{project_id}/comparison", response_model=ComparisonDocument)
+    def get_comparison(project_id: str, x: str = "seconds") -> dict:
+        if x not in {"seconds", "progress"}:
+            raise AppError(400, "invalid_x", "Comparison x must be seconds or progress.")
+        try:
+            return build_comparison(connection, settings.data_root, project_id, x)
+        except AlbumError as exc:
+            raise _album(exc) from exc
+
+    @app.get("/api/projects/{project_id}/reviews", response_model=list[ReviewRecord])
+    def get_reviews(project_id: str) -> list[dict]:
+        try:
+            return review_view(connection, settings.data_root, project_id)
+        except AlbumError as exc:
+            raise _album(exc) from exc
+
+    @app.put("/api/projects/{project_id}/reviews", response_model=ReviewRecord)
+    def put_review(project_id: str, body: ReviewUpdate) -> dict:
+        try:
+            return save_review(
+                connection,
+                settings.data_root,
+                project_id,
+                body.asset_id,
+                body.checkpoint_id,
+                body.status,
+                body.note,
+            )
+        except AlbumError as exc:
+            raise _album(exc) from exc
+
+    @app.post("/api/projects/{project_id}/album-export", response_model=AlbumExportManifest)
+    def create_album_export(project_id: str) -> dict:
+        try:
+            return publish_album_export(connection, settings.data_root, project_id)
+        except AlbumError as exc:
+            raise _album(exc) from exc
+
+    @app.get("/api/projects/{project_id}/album-exports/{export_id}")
+    def download_album_export(project_id: str, export_id: str) -> FileResponse:
+        try:
+            path = open_album_export(connection, settings.data_root, project_id, export_id)
+        except AlbumError as exc:
+            raise _album(exc) from exc
+        return FileResponse(path, media_type="application/zip", filename=f"{export_id}.zip")
+
     @app.post("/api/projects/{project_id}/assets", response_model=UploadResult)
     async def upload_asset(project_id: str, file: UploadFile = File(...)) -> dict:  # noqa: B008
-        _require_project(connection, project_id)
+        project = _require_project(connection, project_id)
+        if project["mode"] == "album":
+            raise AppError(
+                400,
+                "album_does_not_import",
+                "Import a recording in a study, then add it to the album.",
+            )
         original_name = file.filename or "untitled.wav"
         if len(original_name) > 255:
             raise AppError(400, "invalid_name", "File name is too long.")
@@ -671,6 +779,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return {"cache": cache, "asset": asset}
         finally:
             tmp.unlink(missing_ok=True)
+
+    @app.get("/api/assets", response_model=list[Asset])
+    def list_assets() -> list[dict]:
+        rows = connection.execute("SELECT * FROM assets ORDER BY created_at").fetchall()
+        return [asset_dict(row) for row in rows]
 
     @app.get("/api/assets/{asset_id}", response_model=Asset)
     def get_asset(asset_id: str) -> dict:

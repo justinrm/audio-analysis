@@ -47,8 +47,9 @@ export function Library({
         if (cancelled) {
           return
         }
-        setStudies(list)
-        const existing = list[0]
+        const studies = list.filter((item) => item.mode === "study")
+        setStudies(studies)
+        const existing = studies[0]
         if (!existing) {
           setLoading(false)
           return
@@ -77,7 +78,7 @@ export function Library({
     setBusy(true)
     try {
       const created = await api.createProject(name.trim())
-      const list = await api.projects()
+      const list = (await api.projects()).filter((item) => item.mode === "study")
       setStudies(list)
       await openStudy(created.id)
       setFeedback({ role: "status", text: "Study created." })
@@ -109,21 +110,56 @@ export function Library({
     }
   }
 
-  async function importFile(file: File | undefined) {
-    if (!file || !project) {
+  async function importFiles(files: File[]) {
+    if (files.length === 0 || !project) {
       return
     }
-    setFeedback({ role: "status", text: "Importing." })
     setBusy(true)
+    const imported: string[] = []
+    const reused: string[] = []
+    const failed: string[] = []
     try {
-      const result = await api.upload(project.id, file)
-      setFeedback({
-        role: "status",
-        text: result.cache === "hit" ? "Already in the library. Reused the stored file." : "Imported.",
-      })
-      const list = await api.projects()
-      setStudies(list)
-      await openStudy(project.id)
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index]
+        setFeedback({
+          role: "status",
+          text:
+            files.length === 1
+              ? "Importing."
+              : `Importing ${index + 1} of ${files.length}: ${file.name}`,
+        })
+        try {
+          const result = await api.upload(project.id, file)
+          if (result.cache === "hit") {
+            reused.push(file.name)
+          } else {
+            imported.push(file.name)
+          }
+        } catch (error) {
+          if (files.length === 1) {
+            throw error
+          }
+          failed.push(file.name)
+        }
+      }
+      if (files.length === 1) {
+        setFeedback({
+          role: "status",
+          text: reused.length === 1 ? "Already in the library. Reused the stored file." : "Imported.",
+        })
+      } else {
+        const reusedText = reused.length === 0 ? "Reused 0." : `Reused ${reused.length}: ${reused.join(", ")}.`
+        const failedText = failed.length === 0 ? "" : ` Failed: ${failed.join(", ")}.`
+        setFeedback({
+          role: failed.length > 0 ? "alert" : "status",
+          text: `Imported ${imported.length}. ${reusedText}${failedText}`,
+        })
+      }
+      if (imported.length > 0 || reused.length > 0) {
+        const list = (await api.projects()).filter((item) => item.mode === "study")
+        setStudies(list)
+        await openStudy(project.id)
+      }
     } catch (error) {
       setFeedback({
         role: "alert",
@@ -193,12 +229,14 @@ export function Library({
             className="file-input"
             type="file"
             accept=".wav,audio/wav"
+            multiple
             aria-hidden="true"
             tabIndex={-1}
             disabled={busy}
             onChange={(event) => {
-              void importFile(event.target.files?.[0])
+              const selected = Array.from(event.target.files ?? [])
               event.target.value = ""
+              void importFiles(selected)
             }}
           />
         </div>

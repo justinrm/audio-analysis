@@ -110,6 +110,9 @@ export function seriesPaint(
   evidenceClass: string,
   chartKind: string,
 ): { color: string; dash: LineDash } {
+  if (chartKind === "T11") {
+    return { color: LINE_PALETTE[index % LINE_PALETTE.length] ?? SERIES_INK, dash: "solid" }
+  }
   if (unit === "LUFS") {
     return { color: SERIES_LUFS, dash: "dashed" }
   }

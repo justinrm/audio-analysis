@@ -9,12 +9,16 @@ import type {
   LyricChartDocument,
   LyricDocumentOut,
   LyricSegmentUpdate,
+  AlbumExportManifest,
+  ComparisonDocument,
   ExportCreate,
   ExportManifest,
   LyricVerify,
   Peaks,
   Project,
   ProjectDetail,
+  ReviewRecord,
+  ReviewUpdate,
   UploadResult,
 } from "./types"
 
@@ -84,12 +88,54 @@ function lyricPath(projectId: string, assetId: string): string {
 export const api = {
   health: () => fetch("/api/health").then(parse<Health>),
   projects: () => fetch("/api/projects").then(parse<Project[]>),
-  createProject: (name: string) =>
+  createProject: (name: string, mode: "study" | "album" = "study") =>
     fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, mode }),
     }).then(parse<Project>),
+  assets: () => fetch("/api/assets").then(parse<Asset[]>),
+  addMember: (projectId: string, assetId: string) =>
+    fetch(`/api/projects/${projectId}/members`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asset_id: assetId }),
+    }).then(parse<{ asset_id: string; ordering: number }>),
+  removeMember: (projectId: string, assetId: string) =>
+    fetch(`/api/projects/${projectId}/members/${assetId}`, { method: "DELETE" }).then(empty),
+  orderAlbum: (projectId: string, assetIds: string[]) =>
+    fetch(`/api/projects/${projectId}/order`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asset_ids: assetIds }),
+    }).then(parse<{ asset_ids: string[] }>),
+  comparison: (projectId: string, x: "seconds" | "progress" = "seconds") =>
+    fetch(`/api/projects/${projectId}/comparison?x=${x}`).then(parse<ComparisonDocument>),
+  reviews: (projectId: string) => fetch(`/api/projects/${projectId}/reviews`).then(parse<ReviewRecord[]>),
+  saveReview: (projectId: string, body: ReviewUpdate) =>
+    fetch(`/api/projects/${projectId}/reviews`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(parse<ReviewRecord>),
+  createAlbumExport: (projectId: string) =>
+    fetch(`/api/projects/${projectId}/album-export`, { method: "POST" }).then(parse<AlbumExportManifest>),
+  downloadAlbumExport: async (projectId: string, exportId: string, filename: string) => {
+    const response = await fetch(`/api/projects/${projectId}/album-exports/${exportId}`)
+    if (!response.ok) {
+      await parse(response)
+      return
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  },
   project: (id: string) => fetch(`/api/projects/${id}`).then(parse<ProjectDetail>),
   upload: (projectId: string, file: File) => {
     const body = new FormData()

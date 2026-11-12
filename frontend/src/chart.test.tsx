@@ -395,6 +395,43 @@ describe("coordinated presentation", () => {
     expect(loudness.axis_definitions.y_scale).toBe("linear")
   })
 
+  it("splits T11 loudness and level and does not seek the recording", () => {
+    const comparison: ChartDocument = {
+      ...waveform,
+      chart_kind: "T11",
+      title: "Album comparison",
+      series: {
+        lines: [
+          { name: "1. Left.wav — 1 s RMS", unit: "dBFS", x: [0, 2], y: [-20, -10] },
+          { name: "2. Right.wav — 1 s RMS", unit: "dBFS", x: [0, 1], y: [-12, -12] },
+          { name: "1. Left.wav — 3 s short-term LUFS", unit: "LUFS", x: [0, 2], y: [-16, -15] },
+          { name: "2. Right.wav — 3 s short-term LUFS", unit: "LUFS", x: [0, 1], y: [-11, -11] },
+        ],
+        bars: [],
+        heatmap: null,
+      },
+      axis_definitions: { x: "Time (s)", y: "dBFS or LUFS", y_scale: "linear" },
+      review_markers: [],
+    }
+    const seen: number[] = []
+    resetPlot()
+    render(<ChartView chart={comparison} onSeek={(seconds) => seen.push(seconds)} />)
+    const yAxis = chartOption().yAxis as { name?: string }[]
+    expect(yAxis.map((axis) => axis.name)).toEqual(["dBFS", "LUFS"])
+    const series = chartOption().series as { name?: string; data?: [number, number | null][] }[]
+    expect(series.find((item) => item.name === "1. Left.wav — 1 s RMS")?.data).toEqual([
+      [0, -20],
+      [2, -10],
+    ])
+    expect(series.find((item) => item.name === "1. Left.wav — 3 s short-term LUFS")?.data).toEqual([
+      [0, -16],
+      [2, -15],
+    ])
+    plotted.point = [1, -18]
+    plotted.click?.({ offsetX: 12, offsetY: 12 })
+    expect(seen).toEqual([])
+  })
+
   it("shows the stored Welch samples on a log frequency axis and does not seek", () => {
     const spectrum: ChartDocument = {
       ...waveform,

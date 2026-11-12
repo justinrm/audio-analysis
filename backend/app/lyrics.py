@@ -79,9 +79,11 @@ def lyric_kind(original_name: str) -> str:
 
 
 def require_membership(conn: sqlite3.Connection, project_id: str, asset_id: str) -> sqlite3.Row:
-    project = conn.execute("SELECT 1 FROM projects WHERE id = ?", (project_id,)).fetchone()
+    project = conn.execute("SELECT mode FROM projects WHERE id = ?", (project_id,)).fetchone()
     if project is None:
         raise LyricError(404, "not_found", "Project not found.")
+    if project["mode"] != "study":
+        raise LyricError(400, "not_study", "Lyrics and recording exports belong to a study.")
     row = conn.execute(
         """
         SELECT assets.* FROM assets
