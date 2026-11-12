@@ -4,7 +4,7 @@ Local-first audio analysis, interactive diagnostics, and evidence-driven musical
 
 A listening session does not leave a durable record of level, spectrum, timing, or written structure. Audio Reference Studio stores the original WAV, measures it with a named method, and places those measurements on the same playhead used for listening. A measurement describes the file under that method. It is not a claim about what a listener would hear.
 
-**Technical Analysis** and **Lyrics & Inspiration** are equal workflows for a single recording. Technical Analysis stands on its own with a WAV. Lyrics & Inspiration adds optional text and timing when you want to inspect phrasing, repetition, and structure beside the audio. **Album QC**, for comparing several recordings, is planned and not built.
+**Technical Analysis** and **Lyrics & Inspiration** are equal workflows for a single recording. Technical Analysis stands on its own with a WAV. Lyrics & Inspiration adds optional text and timing when you want to inspect phrasing, repetition, and structure beside the audio. **Album QC**, for comparing several recordings, was accepted on November 11, 2026. It compares stored measurements. The Welch PSD overlay remains deferred.
 
 Local-first. No account. Analysis stays on this machine.
 
@@ -24,16 +24,16 @@ Local-first. No account. Analysis stays on this machine.
 
 ## Features
 
-The two primary workflows are available today. Album QC is not.
+Technical Analysis, Lyrics & Inspiration, and Album QC are accepted. Album QC keeps the deferred Welch PSD overlay. Acceptance limits are in [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 | Workflow | State | What you can do |
 | --- | --- | --- |
 | Technical Analysis | Available | Study a WAV with no lyrics. Measurements use `m1-v3`. Charts T01–T10 are interactive, seek with playback, and can be saved as technical PNGs and a Technical ZIP. |
 | Lyrics & Inspiration | Available | Attach TXT, Markdown, or SRT evidence, time it by hand, and revise it without losing the prior revision. Charts L01–L05 read that document. Explore is the default; Edit is explicit. Lyricist and Combined packages use the saved lyric revision. |
 | Shared studio | Available | Keep the original WAV bytes, store versioned evidence locally, use one playback transport across both workspaces, and build packages from stored results. |
-| Album QC | Planned | Compare level, spectrum, and dynamics across several recordings. The screen is an empty state. Chart T11 is not built. |
+| Album QC | Accepted | Compare stored level, loudness, and dynamics across album recordings. Absolute levels stay dBFS and LUFS. Their differences are dB and LU. Absolute true peak stays dBTP. A difference of one true-peak measurement is dB. The T11 level overlay uses stored series. The Welch PSD overlay is deferred. |
 
-These workflows are not at the same stage. Technical Analysis and Lyrics & Inspiration are implemented. Album QC is only a placeholder. The optional narrative integration is specified and not installed.
+Technical Analysis, Lyrics & Inspiration, and Album QC are accepted. The optional narrative integration remains specified and is not installed. Album QC does not draw the deferred Welch PSD overlay.
 
 ## Quick start
 
@@ -216,7 +216,7 @@ The page calls the membership API:
 
 ## Album QC
 
-Album QC is the planned place to compare several recordings. The Album QC screen tells you comparison is not in this milestone and points you back to a single recording. Chart T11 is not implemented. An [implementation-ready plan](docs/superpowers/plans/2026-11-08-milestone-4-album-qc.md) exists. That plan is not authorization to build it.
+Album QC compares stored measurements for the recordings in an album. It was accepted on November 11, 2026. The accepted workspace covers the ordered tracklist, pairwise differences, ending and rhythm summaries, listening checkpoints, and the album report. Absolute sample peak and RMS stay dBFS. Differences of those levels are dB. Integrated loudness stays LUFS. Its differences are LU. Absolute true peak stays dBTP. A difference of one true-peak measurement is dB. The T11 chart draws stored level series. The Welch PSD overlay is deferred as G9 and is not drawn. The [Album QC plan](docs/superpowers/plans/2026-11-08-milestone-4-album-qc.md) is the accepted scope. A pair-differences layout refinement and a T11 visualization refinement are later candidates and are not part of this acceptance.
 
 ## Architecture
 
@@ -312,7 +312,7 @@ Native keyboard activation of the chart data tables was not fully verified in br
 
 Implemented for one recording: WAV import and playback, `m1-v3` charts T01–T10, lyric evidence with L01–L05, and Technical, Lyricist, and Combined ZIP packages.
 
-Milestone 2 is accepted with two deferred synchronization requirements: shared waveform and chart zoom, and a selected lyric region marked on the waveform and on L01 and L03 together. Milestone 3 is accepted with one exception. The evidence-grounded narrative integration remains a requirement and is not implemented. Album QC and Milestone 4 are planned. The Album QC plan is not authorization to build them.
+Milestone 2 is accepted with two deferred synchronization requirements: shared waveform and chart zoom, and a selected lyric region marked on the waveform and on L01 and L03 together. Milestone 3 is accepted with one exception. The evidence-grounded narrative integration remains a requirement and is not implemented. Milestone 4 Album QC is accepted as of November 11, 2026. The accepted implementation is local commit `bb517b5` and has not been pushed or merged. The Album QC plan is that accepted scope. G9, the Welch PSD overlay, stays deferred. The Pass 3 data table is accepted. G4 stays open because chart zoom remains local to the chart. No further milestone is authorized by that acceptance.
 
 [PROJECT_STATUS.md](PROJECT_STATUS.md) owns implementation and acceptance status. [NEXT_SESSION.md](NEXT_SESSION.md) is the current handoff. The [documentation index](docs/README.md) says which document owns each subject.
 
@@ -321,6 +321,6 @@ Milestone 2 is accepted with two deferred synchronization requirements: shared w
 - [Decision register](docs/OPEN_DECISIONS_AND_UNCERTAINTIES.md) — locked decisions and open contract gaps
 - [Milestone 2 plan](docs/superpowers/plans/2026-10-13-milestone-2.md) — lyric evidence and L01–L05
 - [Milestone 3 export scope](docs/superpowers/plans/2026-11-07-milestone-3-exports.md) — Technical, Lyricist, and Combined packages
-- [Milestone 4 Album QC scope](docs/superpowers/plans/2026-11-08-milestone-4-album-qc.md) — comparison plan, not an authorization to build T11
+- [Milestone 4 Album QC scope](docs/superpowers/plans/2026-11-08-milestone-4-album-qc.md) — accepted November 11, 2026. The T11 Welch PSD overlay remains deferred as G9. Pair-differences layout and T11 visualization refinements are not authorized.
 - [Implementation audit](docs/album_observatory_followup_audit.md) — snapshot from before acceptance of M2-A and M2-B, not an acceptance decision
 - [Local toolchain note](docs/ENVIRONMENT.md) — recovering a stalled Vite or Vitest run
