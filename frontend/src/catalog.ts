@@ -115,31 +115,46 @@ export function combinedEvidenceNote(status: string, evidenceClass: string, cave
   return ""
 }
 
-/** Viewport modes from docs/design/studio-precision.md. Widths are CSS pixels. */
-export function workspaceMode(viewportWidth: number): "wide" | "list-side" | "stacked" | "phone" {
-  if (viewportWidth >= 1332) {
-    return "wide"
-  }
-  if (viewportWidth >= 1100) {
-    return "list-side"
-  }
-  if (viewportWidth >= 928) {
-    return "stacked"
-  }
-  return "phone"
+/** Side-inspector width. This is a presentation budget, not a measured audio threshold. */
+export const INSPECTOR_WIDTH = 288
+
+/** Gap between the chart container and a side inspector. */
+export const INSPECTOR_GAP = 16
+
+/**
+ * Chart-container width that must remain before evidence may sit beside the plot.
+ * A layout constraint, not a scientific measurement threshold.
+ */
+export const INSPECTOR_PLOT_MIN = 800
+
+const RAIL_WIDTH = 176
+const PHONE_MAX = 927
+
+/** Horizontal stage padding on each side. Desktop is 24px. Narrow recording screens are 16px. */
+export function stageGutter(viewportWidth: number): number {
+  return viewportWidth <= PHONE_MAX ? 16 : 24
+}
+
+/** Width inside the recording stage after the rail and gutters. */
+export function recordingStageWidth(viewportWidth: number): number {
+  const rail = viewportWidth <= PHONE_MAX ? 0 : RAIL_WIDTH
+  return viewportWidth - rail - stageGutter(viewportWidth) * 2
+}
+
+/** True when docking a 288px inspector would still leave an 800px chart container. */
+export function inspectorFitsBeside(stageWidth: number): boolean {
+  return stageWidth - INSPECTOR_WIDTH - INSPECTOR_GAP >= INSPECTOR_PLOT_MIN
 }
 
 /**
- * Usable plot width after the rail, 16px stage padding on each side, the chart
- * list, and one 12px gap. Evidence sits under the plot, so it is not subtracted.
- * Assumes a 16px root, matching styles.css.
+ * Technical chart-container width for a viewport.
+ * Open evidence is subtracted only when it fits beside the plot.
+ * Assumes a 16px root and the recording-stage gutters in styles.css.
  */
-export function plotBudget(viewportWidth: number): number {
-  const mode = workspaceMode(viewportWidth)
-  const rail = mode === "phone" ? 0 : 176
-  const inner = viewportWidth - rail - 32
-  if (mode === "wide" || mode === "list-side") {
-    return inner - 160 - 12
+export function plotBudget(viewportWidth: number, evidenceOpen = false): number {
+  const stage = recordingStageWidth(viewportWidth)
+  if (evidenceOpen && inspectorFitsBeside(stage)) {
+    return stage - INSPECTOR_WIDTH - INSPECTOR_GAP
   }
-  return inner
+  return stage
 }

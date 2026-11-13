@@ -176,8 +176,16 @@ describe("recording exports", () => {
     api.updateSegment.mockReset()
   })
 
+  async function openExports() {
+    const control = await screen.findByRole("button", { name: "Export controls" })
+    if (control.getAttribute("aria-expanded") !== "true") {
+      fireEvent.click(control)
+    }
+  }
+
   it("offers three exports and does not send a lyricist export without a document", async () => {
     render(<Analyzer assetId="a" projectId="p" />)
+    await openExports()
     const technical = await screen.findByRole("button", { name: "Export Technical ZIP" })
     const lyricist = screen.getByRole("button", { name: "Export Lyricist ZIP" })
     const combined = screen.getByRole("button", { name: "Export Combined ZIP" })
@@ -198,6 +206,7 @@ describe("recording exports", () => {
     api.lyrics.mockResolvedValue(lyricDocument())
     api.createExport.mockResolvedValue({ export_id: "exp-2" })
     render(<Analyzer assetId="a" projectId="p" />)
+    await openExports()
     const lyricist = await screen.findByRole("button", { name: "Export Lyricist ZIP" })
     await waitFor(() => expect((lyricist as HTMLButtonElement).disabled).toBe(false))
     fireEvent.change(screen.getByLabelText("Lyric text in export"), { target: { value: "included" } })
@@ -220,6 +229,7 @@ describe("recording exports", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Edit Cue 1" }))
     const line = await screen.findByLabelText("Text for Cue 1")
     fireEvent.change(line, { target: { value: "unsaved line" } })
+    await openExports()
     fireEvent.click(screen.getByRole("button", { name: "Export Technical ZIP" }))
     expect((await screen.findByRole("alert")).textContent).toContain("The export was not published.")
     expect((screen.getByLabelText("Text for Cue 1") as HTMLTextAreaElement).value).toBe("unsaved line")
@@ -230,6 +240,7 @@ describe("recording exports", () => {
 
   it("disables exports when the recording is not open from a study", async () => {
     render(<Analyzer assetId="a" />)
+    await openExports()
     const technical = await screen.findByRole("button", { name: "Export Technical ZIP" })
     expect((technical as HTMLButtonElement).disabled).toBe(true)
     expect((screen.getByRole("button", { name: "Export Lyricist ZIP" }) as HTMLButtonElement).disabled).toBe(true)

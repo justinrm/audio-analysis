@@ -81,13 +81,17 @@ export function ChartView({
     const plot = echarts.init(element)
     plotRef.current = plot
     let bucket = tickBudget(element.clientWidth)
-    const apply = (width: number) => {
+    const apply = (width: number, preserveView: boolean) => {
+      const saved = preserveView ? readChartView(plot) : null
       const built = optionFor(chart, playheadRef.current, width)
+      if (saved) {
+        restoreChartView(built.option, saved)
+      }
       playheadsRef.current = built.playheads
       plot.setOption(built.option, { notMerge: true })
       return built
     }
-    const built = apply(element.clientWidth)
+    const built = apply(element.clientWidth, false)
     plot.getZr().on("click", (event) => {
       if (chart.chart_kind === "T11") {
         return
@@ -136,7 +140,7 @@ export function ChartView({
       }
       bucket = next
       showRegionLabels = nextLabels
-      apply(element.clientWidth)
+      apply(element.clientWidth, true)
     })
     observer.observe(element)
     return () => {
@@ -1032,6 +1036,52 @@ function valueExtent(times: number[]): { min: number; max: number } | undefined 
   const step = (times[times.length - 1] - times[0]) / (times.length - 1)
   const half = step / 2
   return { min: times[0] - half, max: times[times.length - 1] + half }
+}
+
+type SavedChartView = {
+  zooms: { start?: number; end?: number }[]
+  legend: Record<string, boolean> | null
+}
+
+/** Read the live zoom window and legend selection before a layout-only notMerge rebuild. */
+function readChartView(plot: echarts.ECharts): SavedChartView | null {
+  if (typeof plot.getOption !== "function") {
+    return null
+  }
+  const current = plot.getOption() as {
+    dataZoom?: { start?: number; end?: number } | { start?: number; end?: number }[]
+    legend?: { selected?: Record<string, boolean> } | { selected?: Record<string, boolean> }[]
+  }
+  const zoomSource = current.dataZoom
+  const zooms = Array.isArray(zoomSource) ? zoomSource : zoomSource ? [zoomSource] : []
+  const legendSource = current.legend
+  const legend = Array.isArray(legendSource) ? legendSource[0]?.selected : legendSource?.selected
+  return {
+    zooms: zooms.map((item) => ({ start: item?.start, end: item?.end })),
+    legend: legend ?? null,
+  }
+}
+
+function restoreChartView(option: echarts.EChartsOption, saved: SavedChartView) {
+  const zoom = option.dataZoom
+  if (Array.isArray(zoom)) {
+    zoom.forEach((item, index) => {
+      const previous = saved.zooms[index]
+      if (!previous || !item || Array.isArray(item)) {
+        return
+      }
+      if (typeof previous.start === "number") {
+        item.start = previous.start
+      }
+      if (typeof previous.end === "number") {
+        item.end = previous.end
+      }
+    })
+  }
+  const legend = option.legend
+  if (saved.legend && legend && !Array.isArray(legend)) {
+    legend.selected = { ...(legend.selected ?? {}), ...saved.legend }
+  }
 }
 
 function resolutionSelected(zoomed: boolean): Record<string, boolean> {

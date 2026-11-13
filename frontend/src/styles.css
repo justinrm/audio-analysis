@@ -127,7 +127,7 @@ textarea {
   overflow: hidden;
 }
 
-/* 1332 / 1100 / 928 match plotBudget() in catalog.ts at a 16px root. */
+/* 1332 / 1100 / 928 remain the lyric workspace breakpoints. Technical chart width is plotBudget(). */
 .workspace {
   display: grid;
   grid-template-columns: 10rem minmax(0, 1fr);
@@ -140,6 +140,153 @@ textarea {
   flex-direction: column;
   min-height: 0;
   flex: 1;
+  gap: 0.75rem;
+}
+
+.recording-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+}
+
+.recording-id {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.recording-id .page-title {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.recording-sub {
+  margin: 0.2rem 0 0;
+  color: var(--color-secondary);
+}
+
+.recording-status.evidence {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.25rem;
+  margin: 0;
+}
+
+.recording-status.evidence > div {
+  display: flex;
+  flex-direction: row;
+  gap: 0.35rem;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.recording-actions,
+.transport-tools,
+.chart-toolbar,
+.inspector-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+}
+
+.recording-actions {
+  margin-left: auto;
+}
+
+.quiet-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--color-ink);
+  border: 1px solid var(--color-rule);
+  border-radius: 2px;
+  padding: 0.3rem 0.55rem;
+  cursor: pointer;
+}
+
+.quiet-control:hover,
+.quiet-control:active {
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.quiet-control[aria-expanded="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.recording-disclosure {
+  margin: 0;
+}
+
+.recording-transport {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.chart-toolbar {
+  align-items: end;
+  justify-content: space-between;
+}
+
+.inspector-bar {
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.inspector-bar h2 {
+  margin: 0;
+}
+
+.technical-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.workspace.technical {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+.workspace.technical.is-evidence-side .technical-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 288px;
+  column-gap: 16px;
+  row-gap: 0.75rem;
+  align-items: start;
+}
+
+.workspace.technical.is-evidence-side .chart-toolbar {
+  grid-column: 1 / -1;
+}
+
+.workspace.technical.is-evidence-side .plot {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+}
+
+.workspace.technical.is-evidence-side .inspector {
+  grid-column: 2;
+  grid-row: 2;
+  margin: 0;
+}
+
+.lyric-empty {
+  display: contents;
 }
 
 .deck {
@@ -267,22 +414,22 @@ textarea {
   pointer-events: auto;
 }
 
-.recording:has(.deck.is-compact) .chart {
+.recording:not(.is-waveform-open) .chart {
   height: clamp(22rem, calc(100dvh - 16rem), 40rem);
 }
 
-.recording:has(.deck.is-compact) .chart.stacked:not(.density) {
+.recording:not(.is-waveform-open) .chart.stacked:not(.density) {
   height: clamp(34rem, calc(100dvh - 12rem), 56rem);
 }
 
-.recording:has(.deck.is-compact) .workspace.lyrics .chart:not(.density),
-.recording:has(.deck.is-compact) .workspace.lyrics .chart.stacked:not(.density) {
+.recording:not(.is-waveform-open) .workspace.lyrics .chart:not(.density),
+.recording:not(.is-waveform-open) .workspace.lyrics .chart.stacked:not(.density) {
   height: clamp(14rem, calc(100dvh - 22rem), 24rem);
   min-height: 14rem;
 }
 
 .workspace.lyrics .chart.density,
-.recording:has(.deck.is-compact) .workspace.lyrics .chart.density {
+.recording:not(.is-waveform-open) .workspace.lyrics .chart.density {
   height: clamp(22rem, calc(100dvh - 28rem), 28rem);
   min-height: 22rem;
 }
@@ -298,7 +445,7 @@ textarea {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding-top: 0.75rem;
+  padding-top: 0.35rem;
 }
 
 .plot,
@@ -341,7 +488,46 @@ textarea {
 }
 
 .chart-picker {
-  display: none;
+  display: grid;
+  gap: 0.25rem;
+  flex: 1 1 16rem;
+  min-width: min(100%, 18rem);
+  margin: 0;
+}
+
+.chart-picker select,
+.nav-picker select {
+  width: 100%;
+  background: var(--color-panel);
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+  border-radius: 2px;
+  padding: 0.4rem 0.55rem;
+}
+
+.nav-picker {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 600px) {
+  .rail {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+    padding: 0.35rem 16px;
+  }
+
+  .nav-picker {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    flex: 1 1 12rem;
+    margin-top: 0;
+    gap: 0.35rem 0.5rem;
+  }
 }
 
 .lyric-mount:not([hidden]) {
@@ -546,6 +732,8 @@ textarea {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding-left: 24px;
+  padding-right: 24px;
 }
 
 .stage h1,
@@ -967,8 +1155,9 @@ textarea {
 
 .tabs {
   display: flex;
-  gap: 1rem;
-  margin: 0.75rem 0;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin: 0.35rem 0 0.15rem;
 }
 
 .tabs button {
@@ -1448,7 +1637,37 @@ textarea {
   }
 
   .stage:has(.recording) {
-    padding: 0.35rem 0.75rem 0.5rem;
+    padding: 0.35rem 16px 0.5rem;
+  }
+
+  .recording {
+    gap: 0.4rem;
+  }
+
+  .recording-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.3rem;
+    align-items: start;
+  }
+
+  .recording-actions {
+    margin-left: 0;
+  }
+
+  .technical-panel {
+    gap: 0.45rem;
+  }
+
+  .chart-toolbar {
+    flex-wrap: nowrap;
+    align-items: end;
+  }
+
+  .chart-toolbar .chart-picker {
+    min-width: 0;
+    flex: 1 1 auto;
+    margin-bottom: 0;
   }
 
   .deck {
@@ -1497,9 +1716,9 @@ textarea {
   .transport {
     display: grid;
     grid-template-columns: auto auto minmax(0, 1fr);
-    gap: 0.2rem 0.55rem;
+    gap: 0.2rem 0.35rem;
     align-items: center;
-    margin-top: 0.25rem;
+    margin-top: 0;
   }
 
   .transport > .action {
@@ -1513,9 +1732,21 @@ textarea {
     grid-row: 1;
   }
 
-  .transport-volume {
+  .transport-tools {
     grid-column: 3;
     grid-row: 1;
+    justify-self: end;
+    flex-wrap: nowrap;
+  }
+
+  .transport-tools:has(details[open]) {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: stretch;
+    flex-wrap: wrap;
+  }
+
+  .transport-volume {
     justify-self: end;
   }
 
@@ -1687,6 +1918,18 @@ textarea {
   }
 }
 
+@media (max-width: 380px) {
+  .transport-tools {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .transport-seek {
+    grid-row: 3;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   button,
   a,
@@ -1703,5 +1946,60 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto;
+  }
+}
+
+@media (max-height: 600px) {
+  .stage:has(.recording) {
+    overflow: auto;
+  }
+
+  .recording .study {
+    overflow: visible;
+    flex: none;
+  }
+}
+
+.analyzer-recordings {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.analyzer-recordings button {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-rule);
+  border-radius: 0;
+  padding: 0.55rem 0.2rem;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.analyzer-recordings button:hover,
+.analyzer-recordings button:active {
+  color: var(--color-text);
+}
+
+@media (pointer: coarse) {
+  .recording-actions .action,
+  .recording-actions .quiet-control,
+  .transport > .action,
+  .transport-tools .quiet-control,
+  .chart-toolbar .quiet-control,
+  .chart-toolbar select,
+  .nav-picker select,
+  .analyzer-recordings button {
+    min-height: 44px;
+  }
+
+  .recording-disclosure select,
+  .recording-disclosure input,
+  .transport input,
+  .chart-toolbar select,
+  .analyzer-entry select {
+    font-size: 16px;
   }
 }
