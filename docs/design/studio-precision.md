@@ -10,7 +10,9 @@ The owner approved **Evolved Studio Precision**: keep the charcoal surfaces, bra
 
 That approval does not accept the rest of the November 12 strategy recommendations. The only authorized implementation is Phase 1, control readability and tokens, limited to `frontend/src/styles.css`.
 
-**Phase 1 accepted November 12, 2026.** The owner accepted that stylesheet, including borders and padding on some previously unstyled controls and the 384px listening-note maximum. Acceptance does not certify accessibility and does not authorize Phase 2. The Pass 2 record below is unchanged. Current status is in [NEXT_SESSION.md](../../NEXT_SESSION.md).
+**Phase 1 accepted November 12, 2026.** The owner accepted that stylesheet, including borders and padding on some previously unstyled controls and the 384px listening-note maximum. Acceptance does not certify accessibility. Phase 2 was not authorized by that acceptance. The Pass 2 record below is unchanged. Current status is in [NEXT_SESSION.md](../../NEXT_SESSION.md).
+
+**Phase 2 authorized November 12, 2026, and accepted November 13, 2026.** The owner approved Studio Frame and later accepted the recording-frame implementation, including the reviewed manual-activation tab correction. The product name, Analyzer label, and labeled rail stay. The technical workspace replaces the permanent T01–T10 list with one native selector and places one evidence region beside the chart only when the measured container would still leave an 800px plot. Otherwise that same region sits beneath the chart. The waveform starts collapsed. Analyze, Details, and the existing export controls stay independently reachable. Study tabs move focus with the arrow keys and activate on Enter, Space, or click. Lyrics composition, cue navigation, and lyric-chart layout stay on the accepted workspace. Safari, Firefox, VoiceOver, and comprehensive accessibility certification remain outstanding. The Pass 2 width table below remains the historical record for that earlier pass. It is not the Phase 2 technical-chart budget. This acceptance does not authorize Phase 3.
 
 ## Pass 2 acceptance
 

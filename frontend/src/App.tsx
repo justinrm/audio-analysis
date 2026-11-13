@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { AlbumHome, AlbumWorkspace } from "./album"
 import { Analyzer } from "./analyzer"
+import { AnalyzerEntry } from "./analyzer-entry"
 import { Library } from "./library"
 
 type Route =
@@ -39,10 +40,10 @@ function page(route: Route, go: (next: string) => void) {
       return route.assetId ? (
         <Analyzer assetId={route.assetId} projectId={route.projectId} />
       ) : (
-        <>
-          <h1 className="page-title">Analyzer</h1>
-          <p>Choose a recording from the library.</p>
-        </>
+        <AnalyzerEntry
+          onOpen={(assetId, openedProjectId) => go(`/analyzer?asset=${assetId}&project=${openedProjectId}`)}
+          onLibrary={() => go("/")}
+        />
       )
     case "album":
       return route.projectId ? (
@@ -66,12 +67,53 @@ function page(route: Route, go: (next: string) => void) {
   }
 }
 
+function useNarrowNav(): boolean {
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return
+    }
+    const query = window.matchMedia("(max-width: 600px)")
+    const apply = () => setNarrow(query.matches)
+    apply()
+    query.addEventListener("change", apply)
+    return () => query.removeEventListener("change", apply)
+  }, [])
+  return narrow
+}
+
 export function App() {
   const [route, setRoute] = useState<Route>(readRoute)
+  const narrowNav = useNarrowNav()
 
   function go(next: string) {
     window.history.pushState(null, "", next)
     setRoute(readRoute())
+  }
+
+  function openAnalyzer() {
+    if (route.name !== "analyzer" || !route.assetId) {
+      go("/analyzer")
+      return
+    }
+    const project = route.projectId ? `&project=${route.projectId}` : ""
+    go(`/analyzer?asset=${route.assetId}${project}`)
+  }
+
+  function chooseDestination(name: string) {
+    if (name === "library") {
+      go("/")
+      return
+    }
+    if (name === "analyzer") {
+      openAnalyzer()
+      return
+    }
+    if (name === "album") {
+      go("/album")
+      return
+    }
+    go("/settings")
   }
 
   useEffect(() => {
@@ -85,35 +127,40 @@ export function App() {
       <aside className="rail">
         <p className="mark">Reference</p>
         <p className="quiet mt-2 mb-0">A room for one recording, and for comparing a set.</p>
-        <nav className="nav" aria-label="Primary">
-          <button type="button" aria-current={route.name === "library" ? "page" : undefined} onClick={() => go("/")}>
-            Library
-          </button>
-          <button
-            type="button"
-            aria-current={route.name === "analyzer" ? "page" : undefined}
-            onClick={() => {
-              if (route.name !== "analyzer" || !route.assetId) {
-                go("/analyzer")
-                return
-              }
-              const project = route.projectId ? `&project=${route.projectId}` : ""
-              go(`/analyzer?asset=${route.assetId}${project}`)
-            }}
-          >
-            Analyzer
-          </button>
-          <button type="button" aria-current={route.name === "album" ? "page" : undefined} onClick={() => go("/album")}>
-            Album QC
-          </button>
-          <button
-            type="button"
-            aria-current={route.name === "settings" ? "page" : undefined}
-            onClick={() => go("/settings")}
-          >
-            Settings
-          </button>
-        </nav>
+        {narrowNav ? (
+          <label className="nav-picker">
+            Destination
+            <select aria-label="Destination" value={route.name} onChange={(event) => chooseDestination(event.target.value)}>
+              <option value="library">Library</option>
+              <option value="analyzer">Analyzer</option>
+              <option value="album">Album QC</option>
+              <option value="settings">Settings</option>
+            </select>
+          </label>
+        ) : (
+          <nav className="nav" aria-label="Primary">
+            <button type="button" aria-current={route.name === "library" ? "page" : undefined} onClick={() => go("/")}>
+              Library
+            </button>
+            <button
+              type="button"
+              aria-current={route.name === "analyzer" ? "page" : undefined}
+              onClick={openAnalyzer}
+            >
+              Analyzer
+            </button>
+            <button type="button" aria-current={route.name === "album" ? "page" : undefined} onClick={() => go("/album")}>
+              Album QC
+            </button>
+            <button
+              type="button"
+              aria-current={route.name === "settings" ? "page" : undefined}
+              onClick={() => go("/settings")}
+            >
+              Settings
+            </button>
+          </nav>
+        )}
       </aside>
       <main className="stage">{page(route, go)}</main>
     </div>

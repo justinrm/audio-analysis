@@ -1,8 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import type { ChartDocument, ChartSummary } from "./api/types"
 import { TechnicalBoard } from "./analyzer"
-import { playbackCaption, plotBudget, statusLabel, TECHNICAL, workspaceMode } from "./catalog"
+import { inspectorFitsBeside, playbackCaption, plotBudget, statusLabel, TECHNICAL } from "./catalog"
 
 vi.mock("echarts", () => ({
   init: () => ({
@@ -22,6 +22,10 @@ vi.stubGlobal(
     disconnect() {}
   },
 )
+
+function waitForFocus(element: HTMLElement) {
+  return waitFor(() => expect(document.activeElement).toBe(element))
+}
 
 const idle = {
   charts: [] as ChartSummary[],
@@ -49,12 +53,74 @@ describe("milestone 1 analysis state", () => {
 
   it("shows not-run analysis and does not offer a progress control", () => {
     render(<TechnicalBoard {...idle} />)
-    expect(screen.getByRole("tab", { name: "Technical Analysis" }).getAttribute("aria-selected")).toBe("true")
+    const technical = screen.getByRole("tab", { name: "Technical Analysis" })
+    const lyrics = screen.getByRole("tab", { name: "Lyrics & Inspiration" })
+    expect(technical.getAttribute("aria-selected")).toBe("true")
+    expect(document.getElementById(technical.getAttribute("aria-controls") || "")).toBeTruthy()
+    expect(document.getElementById(lyrics.getAttribute("aria-controls") || "")).toBeTruthy()
+    expect(document.querySelectorAll("#study-technical")).toHaveLength(1)
+    expect(document.querySelectorAll("#study-lyrics")).toHaveLength(1)
     expect(screen.getAllByText(/not run/i).length).toBeGreaterThan(0)
     expect(screen.queryByRole("progressbar")).toBeNull()
-    fireEvent.click(screen.getByRole("tab", { name: "Lyrics & Inspiration" }))
+    fireEvent.click(lyrics)
     expect(screen.getByText(/sung timing is not guessed/i)).toBeTruthy()
     expect(screen.getByText(/no evidence yet/i)).toBeTruthy()
+    expect(document.querySelectorAll("#study-technical")).toHaveLength(1)
+    expect(document.querySelectorAll("#study-lyrics")).toHaveLength(1)
+  })
+
+  it("moves study focus from the focused tab and keeps both panels addressable", () => {
+    render(
+      <TechnicalBoard {...idle} lyricsPanel={<textarea aria-label="Lyric draft" defaultValue="" />} />,
+    )
+    const technical = screen.getByRole("tab", { name: "Technical Analysis" })
+    const lyrics = screen.getByRole("tab", { name: "Lyrics & Inspiration" })
+    expect(document.getElementById("study-technical")?.hasAttribute("hidden")).toBe(false)
+    expect(document.getElementById("study-lyrics")?.hasAttribute("hidden")).toBe(true)
+    expect(document.querySelector("#study-lyrics textarea")).toBeNull()
+
+    technical.focus()
+    fireEvent.keyDown(technical, { key: "ArrowRight" })
+    expect(document.activeElement).toBe(lyrics)
+    expect(technical.getAttribute("aria-selected")).toBe("true")
+    expect(lyrics.getAttribute("aria-selected")).toBe("false")
+
+    fireEvent.keyDown(lyrics, { key: "ArrowLeft" })
+    expect(document.activeElement).toBe(technical)
+    expect(technical.getAttribute("aria-selected")).toBe("true")
+
+    fireEvent.keyDown(technical, { key: "ArrowRight" })
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowRight" })
+    expect(document.activeElement).toBe(technical)
+    expect(technical.getAttribute("aria-selected")).toBe("true")
+    fireEvent.keyDown(technical, { key: "ArrowLeft" })
+    expect(document.activeElement).toBe(lyrics)
+    expect(lyrics.getAttribute("aria-selected")).toBe("false")
+
+    fireEvent.keyDown(lyrics, { key: "Enter" })
+    expect(lyrics.getAttribute("aria-selected")).toBe("true")
+    expect(document.getElementById("study-technical")).toBeTruthy()
+    expect(document.querySelectorAll("#study-lyrics")).toHaveLength(1)
+    const draft = screen.getByRole("textbox", { name: "Lyric draft" })
+    fireEvent.change(draft, { target: { value: "unsaved line" } })
+
+    fireEvent.keyDown(lyrics, { key: "ArrowLeft" })
+    expect(document.activeElement).toBe(technical)
+    expect(lyrics.getAttribute("aria-selected")).toBe("true")
+    fireEvent.keyDown(technical, { key: " " })
+    expect(technical.getAttribute("aria-selected")).toBe("true")
+    expect(draft.closest("[hidden]")).toBeTruthy()
+    expect(draft.closest("[inert]")).toBeTruthy()
+    expect(screen.queryByRole("textbox", { name: "Lyric draft" })).toBeNull()
+    draft.focus()
+    expect(document.activeElement).not.toBe(draft)
+    expect((draft as HTMLTextAreaElement).value).toBe("unsaved line")
+
+    fireEvent.keyDown(technical, { key: "ArrowRight" })
+    fireEvent.keyDown(lyrics, { key: "Enter" })
+    expect((screen.getByRole("textbox", { name: "Lyric draft" }) as HTMLTextAreaElement).value).toBe("unsaved line")
+    expect(document.querySelectorAll("#study-technical")).toHaveLength(1)
+    expect(document.querySelectorAll("#study-lyrics")).toHaveLength(1)
   })
 
   it("shows a measured value and keeps a failed chart visible", () => {
@@ -120,14 +186,20 @@ describe("milestone 1 analysis state", () => {
     expect(screen.getByText(/-14\.2 LUFS/)).toBeTruthy()
     expect(screen.getByRole("heading", { name: /Loudness and dynamics/ }).textContent).toMatch(/Measured/)
     expect(screen.getByText("Status: Ready")).toBeTruthy()
+    const evidence = screen.getByRole("button", { name: "Evidence" })
+    expect(evidence.getAttribute("aria-controls")).toBe("chart-evidence")
+    if (evidence.getAttribute("aria-expanded") !== "true") {
+      fireEvent.click(evidence)
+    }
     expect(screen.getByText("Short files make the loudness range unstable.")).toBeTruthy()
     expect(screen.getByRole("heading", { name: "Limitations" })).toBeTruthy()
-    expect((screen.getByText("Evidence").closest("details") as HTMLDetailsElement).open).toBe(true)
-    expect(screen.getByRole("button", { name: /T03/i }).textContent).toMatch(/Failed/)
+    expect(window.document.querySelectorAll("#chart-evidence")).toHaveLength(1)
+    const chart = screen.getByRole("combobox", { name: "Chart" })
+    expect(chart.textContent).toMatch(/T03 Long-term spectral balance \(Failed\)/)
     expect(screen.queryByRole("progressbar")).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: /sample peak/i }))
     expect(seen).toEqual([1.25])
-    fireEvent.click(screen.getByRole("button", { name: /T03/i }))
+    fireEvent.change(chart, { target: { value: "T03" } })
     expect(seen).toEqual([1.25, "T03"])
   })
 
@@ -148,26 +220,69 @@ describe("milestone 1 analysis state", () => {
     ]
     render(<TechnicalBoard {...idle} charts={charts} chartId="T01" document={null} />)
     expect(screen.getByText("Loading this chart.")).toBeTruthy()
+    const evidence = screen.getByRole("button", { name: "Evidence" })
+    if (evidence.getAttribute("aria-expanded") !== "true") {
+      fireEvent.click(evidence)
+    }
     expect(screen.getByText(/still loading/i)).toBeTruthy()
     expect(screen.queryByText(/No evidence yet/i)).toBeNull()
   })
 
-  it("keeps the plot at least 720px beside a list from 1100px up", () => {
-    expect(workspaceMode(1440)).toBe("wide")
-    expect(workspaceMode(1280)).toBe("list-side")
-    expect(workspaceMode(1000)).toBe("stacked")
-    expect(workspaceMode(390)).toBe("phone")
-    expect(plotBudget(1440)).toBe(1060)
-    expect(plotBudget(1332)).toBe(952)
-    expect(plotBudget(1280)).toBe(900)
-    expect(plotBudget(1100)).toBe(720)
-    expect(plotBudget(1099)).toBe(891)
-    expect(plotBudget(1000)).toBe(792)
-    expect(plotBudget(928)).toBe(720)
+  it("budgets chart width without a permanent chart list", () => {
+    expect(plotBudget(1640)).toBe(1416)
+    expect(plotBudget(1640, true)).toBe(1112)
+    expect(plotBudget(1440)).toBe(1216)
+    expect(plotBudget(1440, true)).toBe(912)
+    expect(plotBudget(1328, true)).toBe(800)
+    expect(plotBudget(1327, true)).toBe(1103)
+    expect(plotBudget(1280)).toBe(1056)
+    expect(plotBudget(1280, true)).toBe(1056)
+    expect(plotBudget(1024)).toBe(800)
+    expect(plotBudget(928)).toBe(704)
     expect(plotBudget(927)).toBe(895)
     expect(plotBudget(390)).toBe(358)
-    expect(plotBudget(1440)).toBeGreaterThanOrEqual(720)
-    expect(plotBudget(1100)).toBeGreaterThanOrEqual(720)
+    expect(plotBudget(320)).toBe(288)
+    expect(inspectorFitsBeside(1104)).toBe(true)
+    expect(inspectorFitsBeside(1103)).toBe(false)
+  })
+
+  it("opens one evidence region beside the chart when the measured stage can hold it", async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth")
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get() {
+        return 1200
+      },
+    })
+    try {
+      render(<TechnicalBoard {...idle} />)
+      await waitFor(() =>
+        expect(document.querySelector("[data-evidence-placement]")?.getAttribute("data-evidence-placement")).toBe(
+          "side",
+        ),
+      )
+      expect(document.querySelectorAll("#chart-evidence")).toHaveLength(1)
+      expect(screen.getByRole("button", { name: "Evidence" }).getAttribute("aria-expanded")).toBe("true")
+    } finally {
+      if (descriptor) {
+        Object.defineProperty(HTMLElement.prototype, "clientWidth", descriptor)
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, "clientWidth")
+      }
+    }
+  })
+
+  it("returns evidence focus to its trigger and keeps one evidence region", async () => {
+    render(<TechnicalBoard {...idle} />)
+    const evidence = screen.getByRole("button", { name: "Evidence" })
+    expect(document.querySelector("[data-evidence-placement]")?.getAttribute("data-evidence-placement")).toBe("closed")
+    fireEvent.click(evidence)
+    expect(evidence.getAttribute("aria-expanded")).toBe("true")
+    expect(document.querySelector("[data-evidence-placement]")?.getAttribute("data-evidence-placement")).toBe("below")
+    expect(document.querySelectorAll("#chart-evidence")).toHaveLength(1)
+    fireEvent.click(screen.getByRole("button", { name: "Close evidence" }))
+    expect(evidence.getAttribute("aria-expanded")).toBe("false")
+    await waitForFocus(evidence)
   })
 
   it("labels job and playback status without rewriting evidence class", () => {

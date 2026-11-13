@@ -9,7 +9,10 @@ const plotted: {
   events: Record<string, (event?: { start?: number; end?: number }) => void>
   click?: (event: { offsetX: number; offsetY: number }) => void
   point: number[]
-} = { calls: [], inits: 0, events: {}, point: [0, 0] }
+  view: Record<string, unknown> | null
+} = { calls: [], inits: 0, events: {}, point: [0, 0], view: null }
+
+const resizeObservers: ResizeObserverCallback[] = []
 
 function chartOption(): Record<string, unknown> {
   const option = [...plotted.calls].reverse().find((item) => item.xAxis)
@@ -40,6 +43,9 @@ vi.mock("echarts", () => ({
         return plotted.point
       },
       getOption() {
+        if (plotted.view) {
+          return plotted.view
+        }
         return plotted.calls.find((option) => option.xAxis) ?? {}
       },
       on(name: string, handler: (event?: { start?: number; end?: number }) => void) {
@@ -54,6 +60,9 @@ vi.mock("echarts", () => ({
 vi.stubGlobal(
   "ResizeObserver",
   class {
+    constructor(callback: ResizeObserverCallback) {
+      resizeObservers.push(callback)
+    }
     observe() {}
     unobserve() {}
     disconnect() {}
@@ -197,6 +206,18 @@ function resetPlot() {
   plotted.events = {}
   plotted.click = undefined
   plotted.point = [0, 0]
+  plotted.view = null
+  resizeObservers.length = 0
+}
+
+function resizeChart(name: string, width: number) {
+  const img = screen.getByRole("img", { name })
+  Object.defineProperty(img, "clientWidth", { configurable: true, get: () => width })
+  const observer = resizeObservers.at(-1)
+  if (!observer) {
+    throw new Error("chart resize observer was not registered")
+  }
+  observer([], observer as unknown as ResizeObserver)
 }
 
 describe("T01 panels", () => {
@@ -254,6 +275,73 @@ describe("T01 panels", () => {
     const restored = plotted.calls.at(-1)?.legend as { selected?: Record<string, boolean> }
     expect(restored.selected?.["Envelope max"]).toBe(false)
     expect(restored.selected?.["Overview envelope max"]).toBe(true)
+  })
+
+  it("keeps zoom and legend selection when notMerge rebuilds after a tick change", () => {
+    resetPlot()
+    render(<ChartView chart={waveform} onSeek={() => undefined} />)
+    const initial = plotted.calls.length
+    resizeChart("Waveform and peak envelope", 900)
+    expect(plotted.calls.length).toBe(initial)
+    plotted.view = {
+      dataZoom: [
+        { start: 15, end: 40 },
+        { start: 15, end: 40 },
+      ],
+      legend: [{ selected: { "Envelope max": false, "100 ms RMS": false } }],
+    }
+    resizeChart("Waveform and peak envelope", 500)
+    const option = chartOption()
+    const zoom = option.dataZoom as { start?: number; end?: number }[]
+    expect(zoom[0]).toMatchObject({ start: 15, end: 40 })
+    expect(zoom[1]).toMatchObject({ start: 15, end: 40 })
+    const selected = (option.legend as { selected?: Record<string, boolean> }).selected
+    expect(selected?.["Envelope max"]).toBe(false)
+    expect(selected?.["100 ms RMS"]).toBe(false)
+    expect(option.xAxis).toBeTruthy()
+  })
+
+  it("keeps a zoomed T01 envelope choice across the same notMerge rebuild", () => {
+    const switched: ChartDocument = {
+      ...waveform,
+      series: {
+        ...waveform.series,
+        lines: [
+          { name: "Envelope max", unit: "amplitude", x: [0.1, 0.2, 0.3], y: [0.2, 0.9, 0.4] },
+          { name: "Envelope min", unit: "amplitude", x: [0.1, 0.2, 0.3], y: [-0.2, -0.4, -0.1] },
+          { name: "Overview envelope max", unit: "amplitude", x: [0.2], y: [0.9] },
+          { name: "Overview envelope min", unit: "amplitude", x: [0.2], y: [-0.4] },
+          { name: "100 ms RMS", unit: "dBFS", x: [0.1], y: [-12] },
+        ],
+      },
+    }
+    resetPlot()
+    render(<ChartView chart={switched} onSeek={() => undefined} />)
+    const initial = chartOption().legend as { selected?: Record<string, boolean> }
+    expect(initial.selected?.["Overview envelope max"]).toBe(true)
+    expect(initial.selected?.["Envelope max"]).toBe(false)
+    plotted.view = {
+      dataZoom: [
+        { start: 10, end: 40 },
+        { start: 10, end: 40 },
+      ],
+      legend: [
+        {
+          selected: {
+            "Envelope max": true,
+            "Envelope min": true,
+            "Overview envelope max": false,
+            "Overview envelope min": false,
+          },
+        },
+      ],
+    }
+    resizeChart("Waveform and peak envelope", 420)
+    const selected = (chartOption().legend as { selected?: Record<string, boolean> }).selected
+    expect(selected?.["Envelope max"]).toBe(true)
+    expect(selected?.["Overview envelope max"]).toBe(false)
+    const zoom = chartOption().dataZoom as { start?: number; end?: number }[]
+    expect(zoom[0]).toMatchObject({ start: 10, end: 40 })
   })
 })
 
